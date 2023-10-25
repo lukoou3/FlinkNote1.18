@@ -7,6 +7,9 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.Collector;
 
+/**
+ * WordCount, 最基础的flink程序
+ */
 public class DataStreamWordCount {
 
     public static void main(String[] args) throws Exception {
@@ -29,7 +32,7 @@ public class DataStreamWordCount {
 
         rstDs.print();
 
-        env.execute("Fraud Detection");
+        env.execute("DataStreamWordCount");
     }
 
 }
