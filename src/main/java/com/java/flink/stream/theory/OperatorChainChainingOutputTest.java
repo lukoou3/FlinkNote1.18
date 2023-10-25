@@ -30,17 +30,20 @@ public class OperatorChainChainingOutputTest {
          *
          * ChainingOutput直接把record发送下游
          * CopyingChainingOutput需要serializer.copy(data)后发送下游，调用的是TypeSerializer.copy方法直接生成对象，task直接shuffle网络通信时调用的是TypeSerializer.serialize方法
+         *
+         * pojo对应的TypeSerializer是PojoSerializer
          */
-        env.getConfig().enableObjectReuse();
+        //env.getConfig().enableObjectReuse();
 
         DataStream<Data> ds = env.fromSequence(1, Integer.MAX_VALUE).map(x -> {
+            Thread.sleep(1000);
            return new Data(x, x.toString());
         });
 
         ds.addSink(new RichSinkFunction<Data>() {
             @Override
             public void invoke(Data value, Context context) throws Exception {
-                System.out.println(value);;
+                System.out.println(value);
             }
         });
 
@@ -54,9 +57,11 @@ public class OperatorChainChainingOutputTest {
         public Data(long id, String name) {
             this.id = id;
             this.name = name;
+            System.out.println("Data(id, name) init");
         }
 
         public Data() {
+            System.out.println("Data() init");
         }
 
         public long getId() {
