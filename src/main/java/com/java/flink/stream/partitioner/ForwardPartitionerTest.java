@@ -60,6 +60,7 @@ public class ForwardPartitionerTest {
 
     /**
      * disableChaining分成多个task，但是上游分区1还是对应下游分区1，数据是在本地进程通信的
+     * RecordWriterOutput的RecordWriter recordWriter 属性类型是ChannelSelectorRecordWriter， numberOfChannels就是1
      */
     @Test
     public void testForwardDisableChain() throws Exception{
