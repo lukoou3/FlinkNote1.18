@@ -1,5 +1,6 @@
 package com.java.flink.util;
 
+import com.java.flink.util.function.SupplierWithException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,11 +17,11 @@ public class SingleValueMap {
     static final Logger LOG = LoggerFactory.getLogger(SingleValueMap.class);
     private static Map<Object, Data<?>> cache = new LinkedHashMap<>();
 
-    public static synchronized <T> Data<T> acquireData(Object key, DataSupplier<T> dataSupplier) throws Exception{
+    public static synchronized <T> Data<T> acquireData(Object key, SupplierWithException<T> dataSupplier) throws Exception{
         return acquireData(key, dataSupplier, x -> {});
     }
 
-    public static synchronized <T> Data<T> acquireData(Object key, DataSupplier<T> dataSupplier, Consumer<T> releaseFunc) throws Exception {
+    public static synchronized <T> Data<T> acquireData(Object key, SupplierWithException<T> dataSupplier, Consumer<T> releaseFunc) throws Exception {
         assert releaseFunc != null;
         Data<?> existingData = cache.get(key);
         Data<T> data;
@@ -64,11 +65,6 @@ public class SingleValueMap {
             data.destroy();
             iter.remove();
         }
-    }
-
-    @FunctionalInterface
-    public static interface DataSupplier<T> {
-        T get() throws Exception;
     }
 
     public final static class Data<T>{
