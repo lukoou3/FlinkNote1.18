@@ -34,6 +34,14 @@ public class LoadIntervalDataOptions {
         return failOnException;
     }
 
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static LoadIntervalDataOptions defaults() {
+        return builder().build();
+    }
+
     public static final class Builder {
         private long intervalMs = DEFAULT_INTERVAL_MILLIS;
         private int maxRetries = DEFAULT_MAX_RETRY_TIMES;

@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 import java.util.function.Predicate;
 
 public class Utils {
-    static final Logger LOG = LoggerFactory.getLogger(SingleValueMap.class);
+    static final Logger LOG = LoggerFactory.getLogger(Utils.class);
 
     /**
      *
