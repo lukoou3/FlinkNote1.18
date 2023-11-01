@@ -31,7 +31,8 @@ public class FieldGeneUtils {
                 case "long_inc":
                     gene = new LongGeneInc(
                             fields.getString("name"),
-                            fields.getLongValue("start", 0)
+                            fields.getLongValue("start", 0),
+                            fields.getLongValue("step", 1)
                     );
                     break;
                 case "long_random":

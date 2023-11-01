@@ -7,13 +7,14 @@ public class IntGeneRandom extends AbstractFieldGene<Integer>{
     private int end;
     private double nullRatio;
     private boolean nullAble;
-
+    private boolean oneValue;
     public IntGeneRandom(String fieldName, int start, int end, double nullRatio) {
         super(fieldName);
         this.start = start;
-        this.end = end;
+        this.end = end + 1;
         this.nullRatio = nullRatio;
         this.nullAble = nullRatio > 0D;
+        this.oneValue = start == end;
     }
 
     @Override
@@ -21,6 +22,9 @@ public class IntGeneRandom extends AbstractFieldGene<Integer>{
         if(nullAble && ThreadLocalRandom.current().nextDouble() < nullRatio){
             return null;
         }else{
+            if(oneValue){
+                return start;
+            }
             return ThreadLocalRandom.current().nextInt(start, end);
         }
     }
