@@ -3,7 +3,7 @@ package com.java.flink.gene;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-public class TimestampFormatGene extends AbstractFieldGene<String> {
+public class TimestampFormatedGene extends AbstractFieldGene<String> {
     // 标准日期时间格式，精确到秒：yyyy-MM-dd HH:mm:ss
     public static final String NORM_DATETIME_PATTERN = "yyyy-MM-dd HH:mm:ss";
     public static final DateTimeFormatter NORM_DATETIME_FORMATTER = DateTimeFormatter.ofPattern(NORM_DATETIME_PATTERN);
@@ -15,11 +15,11 @@ public class TimestampFormatGene extends AbstractFieldGene<String> {
     private final DateTimeFormatter formatter;
 
 
-    public TimestampFormatGene(String fieldName) {
+    public TimestampFormatedGene(String fieldName) {
         this(fieldName, NORM_DATETIME_PATTERN);
     }
 
-    public TimestampFormatGene(String fieldName, String format) {
+    public TimestampFormatedGene(String fieldName, String format) {
         super(fieldName);
         assert format != null;
         this.format = format;
