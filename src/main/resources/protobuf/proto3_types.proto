@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+// [START java_declaration]
+// option java_multiple_files = true;
+option java_package = "com.java.flink.stream.proto";
+option java_outer_classname = "Proto3TypesProtos";
+// [END java_declaration]
+
+message StructMessage {
+  int64 id = 1;
+  string name = 2;
+  int32 age = 3;
+  double score = 4;
+}
+
+message Proto3Types {
+  enum NestedEnum {
+    NOTHING = 0;
+    FIRST = 1;
+    SECOND = 2;
+  }
+
+  int64 int = 1;
+  string text = 2;
+  NestedEnum enum_val = 3;
+  StructMessage message = 4;
+
+  optional int64 optional_int = 5;
+  optional string optional_text = 6;
+  optional NestedEnum optional_enum_val = 7;
+  optional StructMessage optional_message = 8;
+
+  repeated int64 repeated_num = 9;
+  repeated StructMessage repeated_message = 10;
+  map<string, string> map = 11;
+}
