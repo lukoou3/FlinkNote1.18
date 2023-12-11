@@ -8,10 +8,7 @@ import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.WireFormat;
 import org.apache.flink.util.Preconditions;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class SchemaConverters {
     public static StructType toStructType(Descriptor descriptor) {
@@ -82,7 +79,10 @@ public class SchemaConverters {
             Preconditions.checkArgument(maxNumber < 10000, maxNumber);
             fieldDescArray = new FieldDesc[maxNumber + 1];
             for (FieldDescriptor field : fields) {
-                fieldDescArray[field.getNumber()] = new FieldDesc(field, dataType);
+                Optional<StructField> structFieldOptional = Arrays.stream(dataType.fields).filter(f -> f.name.equals(field.getName())).findFirst();
+                if(structFieldOptional.isPresent()){
+                    fieldDescArray[field.getNumber()] = new FieldDesc(field, structFieldOptional.get().dataType);
+                }
             }
         }
 
@@ -120,27 +120,32 @@ public class SchemaConverters {
                     continue;
                 }
 
-                final Object value;
+                String name = fieldDesc.field.getName();
                 if (packed) {
                     final int length = input.readRawVarint32();
                     final int limit = input.pushLimit(length);
-                    value = fieldDesc.valueConverter.convert(input, true);
+                    List<Object> array = (List<Object>) fieldDesc.valueConverter.convert(input, true);
                     input.popLimit(limit);
+                    List<Object> oldArray = (List<Object>)data.get(name);
+                    if(oldArray == null){
+                        data.put(name, array);
+                    }else{
+                        oldArray.addAll(array);
+                    }
                 } else {
-                    value = fieldDesc.valueConverter.convert(input, false);
+                    final Object value = fieldDesc.valueConverter.convert(input, false);
+                    if(!fieldDesc.field.isRepeated()){
+                        data.put(name, value);
+                    }else{
+                        List<Object> array = (List<Object>)data.get(name);
+                        if(array == null){
+                            array = new ArrayList<>();
+                            data.put(name, array);
+                        }
+                        array.add(value);
+                    }
                 }
 
-                String name = fieldDesc.field.getName();
-                if(!fieldDesc.field.isRepeated()){
-                    data.put(name, value);
-                }else{
-                    List<Object> array = (List<Object>)data.get(name);
-                    if(array == null){
-                        array = new ArrayList<>();
-                        data.put(name, array);
-                    }
-                    array.add(value);
-                }
             }
 
             return data;

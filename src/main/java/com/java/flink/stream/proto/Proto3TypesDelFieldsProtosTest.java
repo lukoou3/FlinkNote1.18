@@ -124,12 +124,17 @@ public class Proto3TypesDelFieldsProtosTest {
 
             Descriptors.FieldDescriptor.Type type = field.getType();
             SimpleMessageProtosTest.Utf8Validation utf8Validation = field.needsUtf8Check()? SimpleMessageProtosTest.Utf8Validation.STRICT: SimpleMessageProtosTest.Utf8Validation.LAZY;
-            final Object value;
+
 
             if (packed) {
                 final int length = input.readRawVarint32();
                 final int limit = input.pushLimit(length);
-                List<Object> array = new ArrayList<>();
+                String name = field.getName();
+                List<Object> array = (List<Object>)result.get(name);
+                if(array == null){
+                    array = new ArrayList<>();
+                    result.put(name, array);
+                }
                 if (field.getLiteType() == WireFormat.FieldType.ENUM) {
                     array.add(input.readEnum());
                 }else {
@@ -137,9 +142,11 @@ public class Proto3TypesDelFieldsProtosTest {
                         array.add(readPrimitiveField( input, field.getLiteType(), utf8Validation));
                     }
                 }
-                value = array;
                 input.popLimit(limit);
+                System.out.println(name + " -> " + array);
+
             }else{
+                final Object value;
                 switch (field.getType()) {
                     case ENUM:
                         value = input.readEnum();
@@ -150,21 +157,23 @@ public class Proto3TypesDelFieldsProtosTest {
                     default:
                         value = readPrimitiveField(input, field.getLiteType(), utf8Validation);
                 }
+
+                String name = field.getName();
+                System.out.println(name + " -> " + value);
+                if(!field.isRepeated()){
+                    result.put(name, value);
+                }else{
+                    List<Object> array = (List<Object>)result.get(name);
+                    if(array == null){
+                        array = new ArrayList<>();
+                        result.put(name, array);
+                    }
+                    array.add(value);
+                    System.out.println(name + " -> " + array);
+                }
             }
 
-            String name = field.getName();
-            System.out.println(name + " -> " + value);
-            if(!field.isRepeated()){
-                result.put(name, value);
-            }else{
-                List<Object> array = (List<Object>)result.get(name);
-                if(array == null){
-                    array = new ArrayList<>();
-                    result.put(name, array);
-                }
-                array.add(value);
-                System.out.println(name + " -> " + array);
-            }
+
         }
 
         String dataStr = JsonFormat.printer().print(data);
