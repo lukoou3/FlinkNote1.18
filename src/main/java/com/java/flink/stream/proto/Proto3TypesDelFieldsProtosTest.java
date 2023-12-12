@@ -131,7 +131,9 @@ public class Proto3TypesDelFieldsProtosTest {
                 final int limit = input.pushLimit(length);
                 List<Object> array = new ArrayList<>();
                 if (field.getLiteType() == WireFormat.FieldType.ENUM) {
-                    array.add(input.readEnum());
+                    while (input.getBytesUntilLimit() > 0) {
+                        array.add(input.readEnum());
+                    }
                 }else {
                     while (input.getBytesUntilLimit() > 0) {
                         array.add(readPrimitiveField( input, field.getLiteType(), utf8Validation));
