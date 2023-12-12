@@ -39,6 +39,27 @@ public class SimpleMessageProtosTest {
     }
 
     @Test
+    public void testSimpleMessageJavaTypesWriteByHand() throws Exception{
+        Descriptors.Descriptor descriptor = SimpleMessageJavaTypes.getDescriptor();
+        List<Descriptors.FieldDescriptor> fields = descriptor.getFields();
+        Map<String, Object> data = new HashMap<>();
+        data.put(fields.get(0).getName(), 1L);
+        data.put(fields.get(1).getName(), "莫南");
+        data.put(fields.get(2).getName(), 2);
+        data.put(fields.get(3).getName(), 3L);
+        data.put(fields.get(4).getName(), 10.8);
+        data.put(fields.get(5).getName(), 10.6f);
+        data.put(fields.get(6).getName(), true);
+        data.put(fields.get(7).getName(), ByteString.copyFromUtf8("燕青丝"));
+
+        byte[] bytes = null;
+
+        SimpleMessageJavaTypes deserializeData = SimpleMessageJavaTypes.parseFrom(bytes);
+
+    }
+
+
+    @Test
     public void testSimpleMessageJavaTypesDynamicMessage() throws Exception{
         Descriptors.Descriptor descriptor = SimpleMessageJavaTypes.getDescriptor();
         DynamicMessage.Builder builder = DynamicMessage.newBuilder(descriptor);
@@ -57,6 +78,11 @@ public class SimpleMessageProtosTest {
         builder.setField(fields.get(7), ByteString.copyFromUtf8("燕青丝"));
         DynamicMessage message = builder.build();
 
+        /**
+         * com.google.protobuf.AbstractMessageLite#toByteArray()
+         * com.google.protobuf.DynamicMessage#writeTo(com.google.protobuf.CodedOutputStream)
+         * com.google.protobuf.FieldSet#writeTo(com.google.protobuf.CodedOutputStream)
+         */
         byte[] bytes = message.toByteArray();
         DynamicMessage deserializeMessage = DynamicMessage.parseFrom(descriptor, bytes);
 
@@ -390,6 +416,8 @@ public class SimpleMessageProtosTest {
         }
         System.out.println(result);
     }
+
+
 
     public static Descriptors.Descriptor buildDescriptor(byte[] bytes, String messageName)  throws Exception{
         List<Descriptors.FileDescriptor> fileDescriptorList = parseFileDescriptorSet(bytes);
