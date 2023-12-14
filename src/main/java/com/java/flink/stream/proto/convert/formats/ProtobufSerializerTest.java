@@ -120,8 +120,8 @@ public class ProtobufSerializerTest {
         data.put("optional_text", "苏流沙");
         data.put("optional_enum_val", 1);
         data.put("optional_message", message2);
-        data.put("repeated_num", Arrays.asList(1, 2));
-        data.put("repeated_message", Arrays.asList(message, message2));
+        data.put("repeated_num", Arrays.asList(1, 2,3));
+        data.put("repeated_message", Arrays.asList(message, message2, message2));
 
         ProtobufSerializer serializer = new ProtobufSerializer(descriptor);
         byte[] bytes = serializer.serialize(data);
@@ -131,6 +131,134 @@ public class ProtobufSerializerTest {
         CodedInputStream input = CodedInputStream.newInstance(bytes);
         Map<String, Object> result = messageConverter.converter(input);
 
+        System.out.println(data);
+        System.out.println(result);
+    }
+
+    @Test
+    public void testProto3TypesPartialField() throws Exception{
+        String path = getClass().getResource("/protobuf/proto3_types2.desc").getPath();
+        Descriptors.Descriptor descriptor = ProtobufUtils.buildDescriptor(
+                ProtobufUtils.readDescriptorFileContent(path),
+                "Proto3Types2"
+        );
+
+        Map<String, Object> message = new HashMap<>();
+        message.put("id", 1);
+        message.put("name", "燕青丝");
+        message.put("age", 18);
+        //message.put("score", 92);
+        Map<String, Object> message2 = new HashMap<>();
+        message2.put("id", 2L);
+        message2.put("name", "苏流沙");
+        //message2.put("age", 20);
+        message2.put("score", 86);
+
+        List<Descriptors.FieldDescriptor> fields = descriptor.getFields();
+        Map<String, Object> data = new HashMap<>();
+        data.put("int", 1L);
+        data.put("text", "莫南");
+        //data.put("enum_val", 1);
+        data.put("message", message);
+        //data.put("optional_int", 2);
+        data.put("optional_text", "苏流沙");
+        data.put("optional_enum_val", 1);
+        data.put("optional_message", message2);
+        //data.put("repeated_num", Arrays.asList(1, 2,3));
+        data.put("repeated_message", Arrays.asList(message, message2, message2));
+
+        ProtobufSerializer serializer = new ProtobufSerializer(descriptor);
+        byte[] bytes = serializer.serialize(data);
+
+        StructType structType = SchemaConverters.toStructType(descriptor);
+        SchemaConverters.MessageConverter messageConverter = new SchemaConverters.MessageConverter(descriptor, structType);
+        CodedInputStream input = CodedInputStream.newInstance(bytes);
+        Map<String, Object> result = messageConverter.converter(input);
+
+        System.out.println(data);
+        System.out.println(result);
+
+        System.out.println(StringUtils.repeat("#", 100));
+
+        data = new HashMap<>();
+        //data.put("int", 1L);
+        data.put("text", "莫南");
+        //data.put("enum_val", 1);
+        data.put("message", message);
+        data.put("optional_int", 2);
+        data.put("optional_text", "苏流沙");
+        data.put("optional_enum_val", 1);
+        //data.put("optional_message", message2);
+        data.put("repeated_num", Arrays.asList(1, 2,3));
+        data.put("repeated_message", Arrays.asList(message, message2));
+
+        bytes = serializer.serialize(data);
+        input = CodedInputStream.newInstance(bytes);
+        result = messageConverter.converter(input);
+        System.out.println(data);
+        System.out.println(result);
+    }
+
+    @Test
+    public void testProto3TypesDefaultValue() throws Exception{
+        String path = getClass().getResource("/protobuf/proto3_types2.desc").getPath();
+        Descriptors.Descriptor descriptor = ProtobufUtils.buildDescriptor(
+                ProtobufUtils.readDescriptorFileContent(path),
+                "Proto3Types2"
+        );
+
+        Map<String, Object> message = new HashMap<>();
+        message.put("id", 0);
+        message.put("name", "燕青丝");
+        message.put("age", 18);
+        message.put("score", 92);
+        Map<String, Object> message2 = new HashMap<>();
+        message2.put("id", 2L);
+        message2.put("name", "苏流沙");
+        message2.put("age", 20);
+        message2.put("score", 86);
+
+        List<Descriptors.FieldDescriptor> fields = descriptor.getFields();
+        Map<String, Object> data = new HashMap<>();
+        data.put("int", 0L);
+        data.put("text", "");
+        data.put("enum_val", 1);
+        data.put("message", message);
+        data.put("optional_int", 0L);
+        data.put("optional_text", "");
+        data.put("optional_enum_val", 1);
+        data.put("optional_message", message2);
+        data.put("repeated_num", Arrays.<Integer>asList());
+        data.put("repeated_message", Arrays.asList());
+
+        ProtobufSerializer serializer = new ProtobufSerializer(descriptor);
+        byte[] bytes = serializer.serialize(data);
+
+        StructType structType = SchemaConverters.toStructType(descriptor);
+        SchemaConverters.MessageConverter messageConverter = new SchemaConverters.MessageConverter(descriptor, structType);
+        CodedInputStream input = CodedInputStream.newInstance(bytes);
+        Map<String, Object> result = messageConverter.converter(input);
+
+        System.out.println(data);
+        System.out.println(result);
+
+        System.out.println(StringUtils.repeat("#", 100));
+
+        data = new HashMap<>();
+        data.put("int", 0L);
+        data.put("text", "莫南");
+        data.put("enum_val", 0); //
+        data.put("message", message);
+        data.put("optional_int", 0);
+        data.put("optional_text", "");
+        data.put("optional_enum_val", 0);
+        //data.put("optional_message", message2);
+        data.put("repeated_num", Arrays.asList(1, 2,3));
+        //data.put("repeated_message", Arrays.asList(message, message2));
+
+        bytes = serializer.serialize(data);
+        input = CodedInputStream.newInstance(bytes);
+        result = messageConverter.converter(input);
         System.out.println(data);
         System.out.println(result);
     }

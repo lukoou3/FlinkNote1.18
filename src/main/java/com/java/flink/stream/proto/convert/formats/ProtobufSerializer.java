@@ -1,6 +1,7 @@
 package com.java.flink.stream.proto.convert.formats;
 
 import com.google.protobuf.CodedOutputStream;
+import com.google.protobuf.Descriptors.EnumValueDescriptor;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.WireFormat;
@@ -10,7 +11,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class ProtobufSerializer {
@@ -90,6 +90,7 @@ public class ProtobufSerializer {
     static class MessageData extends ProtobufData {
         final FieldData[] fieldDatas;
         final Map<String, FieldData> fieldDataMap;
+        int memoizedSize = -1;
 
         public MessageData(Descriptor descriptor) {
             List<FieldDescriptor> fields = descriptor.getFields();
@@ -103,20 +104,27 @@ public class ProtobufSerializer {
 
         @Override
         public int getSerializedSize() {
+            if(memoizedSize != -1){
+                return memoizedSize;
+            }
+
             int size = 0;
             FieldData fieldData;
             for (int i = 0; i < fieldDatas.length; i++) {
                 fieldData = fieldDatas[i];
-                if (!fieldData.isNull()) {
+                if (fieldData.isNotNull()) {
                     size += fieldData.getSerializedSize();
-                    System.out.println(fieldData.name + " -> " + size);
+                    //System.out.println(fieldData.name + " -> " + size);
                 }
             }
+
+            memoizedSize = size;
             return size;
         }
 
         @Override
-        public void feed(Object obj) throws Exception {
+        public boolean feed(Object obj) throws Exception {
+            memoizedSize = -1;
             Map<String, Object> map = (Map<String, Object>) obj;
             FieldData fieldData;
             for (int i = 0; i < fieldDatas.length; i++) {
@@ -127,6 +135,7 @@ public class ProtobufSerializer {
                     fieldData.feed(value);
                 }
             }
+            return true;
         }
 
         @Override
@@ -134,9 +143,9 @@ public class ProtobufSerializer {
             FieldData fieldData;
             for (int i = 0; i < fieldDatas.length; i++) {
                 fieldData = fieldDatas[i];
-                if (!fieldData.isNull()) {
+                if (fieldData.isNotNull()) {
                     fieldData.writeTo(output);
-                    System.out.println(fieldData.name + " -> " + output.spaceLeft());
+                    //System.out.println(fieldData.name + " -> " + output.spaceLeft());
                 }
             }
         }
@@ -149,6 +158,7 @@ public class ProtobufSerializer {
 
         final String name;
         final boolean message;
+        final boolean optional;
         final boolean packed;
         final boolean repeated;
 
@@ -158,13 +168,14 @@ public class ProtobufSerializer {
             this.field = field;
             this.name = field.getName();
             this.message = field.getType() == FieldDescriptor.Type.MESSAGE;
+            this.optional = field.hasOptionalKeyword();
             this.packed = field.isPacked();
             this.repeated = field.isRepeated();
         }
 
         abstract void reset();
 
-        abstract boolean isNull();
+        abstract boolean isNotNull();
 
         abstract int getSerializedSize();
 
@@ -192,9 +203,12 @@ public class ProtobufSerializer {
                     return () -> new FloatData();
                 case INT64:
                     return () -> new Int64Data();
-                case ENUM:
+                case UINT64:
+                    return () -> new Uint64Data();
                 case INT32:
                     return () -> new Int32Data();
+                case UINT32:
+                    return () -> new Uint64Data();
                 case STRING:
                     return () -> new StringData();
                 case BYTES:
@@ -203,6 +217,9 @@ public class ProtobufSerializer {
                     return () -> new BoolData();
                 case MESSAGE:
                     return () -> new MessageData(field.getMessageType());
+                case ENUM:
+                    int number = ((EnumValueDescriptor) field.getDefaultValue()).getNumber();
+                    return () -> new EnumData(number);
                 default:
                     throw new IllegalArgumentException(String.format("not supported type:%s(%s)", field.getType(), field.getName()));
             }
@@ -211,7 +228,7 @@ public class ProtobufSerializer {
 
     static class ValueFieldData extends FieldData {
         final ProtobufData data;
-        boolean na = true;
+        boolean notNull = false;
 
         ValueFieldData(int tag, int tagSize, FieldDescriptor field, ProtobufData data) {
             super(tag, tagSize, field);
@@ -220,12 +237,12 @@ public class ProtobufSerializer {
 
         @Override
         void reset() {
-            na = true;
+            notNull = false;
         }
 
         @Override
-        boolean isNull() {
-            return na;
+        boolean isNotNull() {
+            return notNull;
         }
 
         @Override
@@ -239,8 +256,10 @@ public class ProtobufSerializer {
 
         @Override
         void feed(Object obj) throws Exception {
-            data.feed(obj);
-            na = false;
+            notNull = data.feed(obj);
+            if(optional){
+                notNull = true;
+            }
         }
 
         @Override
@@ -272,8 +291,8 @@ public class ProtobufSerializer {
         }
 
         @Override
-        boolean isNull() {
-            return pos == 0;
+        boolean isNotNull() {
+            return pos != 0;
         }
 
         @Override
@@ -344,8 +363,9 @@ public class ProtobufSerializer {
         }
 
         @Override
-        void feed(Object obj) throws Exception {
+        boolean feed(Object obj) throws Exception {
             value = convertToDouble(obj);
+            return value != 0D;
         }
 
         @Override
@@ -363,8 +383,9 @@ public class ProtobufSerializer {
         }
 
         @Override
-        void feed(Object obj) throws Exception {
+        boolean feed(Object obj) throws Exception {
             value = convertToFloat(obj);
+            return value != 0F;
         }
 
         @Override
@@ -383,13 +404,34 @@ public class ProtobufSerializer {
         }
 
         @Override
-        void feed(Object obj) throws Exception {
+        boolean feed(Object obj) throws Exception {
             value = convertToInt(obj);
+            return value != 0;
         }
 
         @Override
         void writeTo(CodedOutputStream output) throws Exception {
             output.writeInt32NoTag(value);
+        }
+    }
+
+    static class Uint32Data extends ProtobufData {
+        private int value;
+
+        @Override
+        int getSerializedSize() {
+            return CodedOutputStream.computeInt32SizeNoTag(value);
+        }
+
+        @Override
+        boolean feed(Object obj) throws Exception {
+            value = convertToInt(obj);
+            return value != 0;
+        }
+
+        @Override
+        void writeTo(CodedOutputStream output) throws Exception {
+            output.writeUInt32NoTag(value);
         }
     }
 
@@ -402,13 +444,34 @@ public class ProtobufSerializer {
         }
 
         @Override
-        void feed(Object obj) throws Exception {
+        boolean feed(Object obj) throws Exception {
             value = convertToLong(obj);
+            return value != 0L;
         }
 
         @Override
         void writeTo(CodedOutputStream output) throws Exception {
             output.writeInt64NoTag(value);
+        }
+    }
+
+    static class Uint64Data extends ProtobufData {
+        private long value;
+
+        @Override
+        int getSerializedSize() {
+            return CodedOutputStream.computeInt64SizeNoTag(value);
+        }
+
+        @Override
+        boolean feed(Object obj) throws Exception {
+            value = convertToLong(obj);
+            return value != 0L;
+        }
+
+        @Override
+        void writeTo(CodedOutputStream output) throws Exception {
+            output.writeUInt64NoTag(value);
         }
     }
 
@@ -421,8 +484,9 @@ public class ProtobufSerializer {
         }
 
         @Override
-        void feed(Object obj) throws Exception {
+        boolean feed(Object obj) throws Exception {
             value = obj.toString().getBytes(StandardCharsets.UTF_8);
+            return value.length != 0;
         }
 
         @Override
@@ -440,8 +504,9 @@ public class ProtobufSerializer {
         }
 
         @Override
-        void feed(Object obj) throws Exception {
+        boolean feed(Object obj) throws Exception {
             value = (byte[]) obj;
+            return value.length != 0;
         }
 
         @Override
@@ -459,8 +524,9 @@ public class ProtobufSerializer {
         }
 
         @Override
-        void feed(Object obj) throws Exception {
+        boolean feed(Object obj) throws Exception {
             value = convertToBool(obj);
+            return value;
         }
 
         @Override
@@ -469,11 +535,35 @@ public class ProtobufSerializer {
         }
     }
 
+    static class EnumData extends ProtobufData {
+        private int value;
+        final private int defaultValue;
+
+        public EnumData(int defaultValue) {
+            this.defaultValue = defaultValue;
+        }
+
+        @Override
+        int getSerializedSize() {
+            return CodedOutputStream.computeInt32SizeNoTag(value);
+        }
+
+        @Override
+        boolean feed(Object obj) throws Exception {
+            value = convertToInt(obj);
+            return value != defaultValue;
+        }
+
+        @Override
+        void writeTo(CodedOutputStream output) throws Exception {
+            output.writeInt32NoTag(value);
+        }
+    }
 
     static abstract class ProtobufData {
         abstract int getSerializedSize();
 
-        abstract void feed(Object obj) throws Exception;
+        abstract boolean feed(Object obj) throws Exception;
 
         abstract void writeTo(CodedOutputStream output) throws Exception;
     }

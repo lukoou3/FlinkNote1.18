@@ -76,7 +76,7 @@ public class Proto3TypesProtosTest {
         builder.setField(fields.get(1), "莫南");
         builder.setField(fields.get(2), enumDescriptor.findValueByNumber(1));
         builder.setField(fields.get(3), structMessage);
-        builder.setField(fields.get(4), 2L);
+        builder.setField(fields.get(4), 0L);
         builder.setField(fields.get(5), "苏流沙");
         builder.setField(fields.get(6), enumDescriptor.findValueByNumber(1));
         builder.setField(fields.get(7), structMessage);
