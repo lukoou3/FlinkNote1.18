@@ -5,6 +5,7 @@ import com.google.protobuf.Descriptors.EnumValueDescriptor;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.WireFormat;
+import org.apache.flink.table.runtime.util.StringUtf8Utils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -130,13 +131,34 @@ public class ProtobufSerializer {
             for (int i = 0; i < fieldDatas.length; i++) {
                 fieldData = fieldDatas[i];
                 fieldData.reset();
+            }
+            for (Map.Entry<String, Object> entry : map.entrySet()) {
+                fieldData = fieldDataMap.get(entry.getKey());
+                if(fieldData != null) {
+                    Object value = entry.getValue();
+                    if (value != null) {
+                        fieldData.feed(value);
+                    }
+                }
+            }
+            return true;
+        }
+
+        /*@Override
+        public boolean feed(Object obj) throws Exception {
+            memoizedSize = -1;
+            Map<String, Object> map = (Map<String, Object>) obj;
+            FieldData fieldData;
+            for (int i = 0; i < fieldDatas.length; i++) {
+                fieldData = fieldDatas[i];
+                fieldData.reset();
                 Object value = map.get(fieldData.name);
                 if (value != null) {
                     fieldData.feed(value);
                 }
             }
             return true;
-        }
+        }*/
 
         @Override
         public void writeTo(CodedOutputStream output) throws Exception {
@@ -485,7 +507,8 @@ public class ProtobufSerializer {
 
         @Override
         boolean feed(Object obj) throws Exception {
-            value = obj.toString().getBytes(StandardCharsets.UTF_8);
+            //value = obj.toString().getBytes(StandardCharsets.UTF_8);
+            value = StringUtf8Utils.encodeUTF8(obj.toString());
             return value.length != 0;
         }
 

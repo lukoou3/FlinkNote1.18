@@ -16,6 +16,8 @@ import java.util.*;
  * protoc --descriptor_set_out=proto3_types.desc --java_out=./ proto3_types.proto
  *
  * protoc --descriptor_set_out=proto3_types_del_fields.desc --java_out=./ proto3_types_del_fields.proto
+ *
+ * protoc --descriptor_set_out=log_test.desc --java_out=./ log_test.proto
  */
 public class Proto3TypesProtosTest {
 

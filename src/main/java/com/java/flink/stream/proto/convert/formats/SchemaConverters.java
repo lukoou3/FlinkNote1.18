@@ -6,6 +6,7 @@ import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.WireFormat;
+import org.apache.flink.table.runtime.util.StringUtf8Utils;
 import org.apache.flink.util.Preconditions;
 
 import java.util.*;
@@ -120,7 +121,7 @@ public class SchemaConverters {
                     continue;
                 }
 
-                String name = fieldDesc.field.getName();
+                String name = fieldDesc.name;
                 if (packed) {
                     final int length = input.readRawVarint32();
                     final int limit = input.pushLimit(length);
@@ -154,12 +155,14 @@ public class SchemaConverters {
 
     public static class FieldDesc {
         final FieldDescriptor field;
+        final String name;
         final DataType fieldDataType; // field对应DataType，array类型存对应元素的类型
 
         final ValueConverter valueConverter;
 
         public FieldDesc(FieldDescriptor field, DataType dataType) {
             this.field = field;
+            this.name = field.getName();
             if (dataType instanceof ArrayType) {
                 this.fieldDataType = ((ArrayType) dataType).elementType;
             } else {
@@ -374,7 +377,11 @@ public class SchemaConverters {
                     }
                 case STRING:
                     if (fieldDataType instanceof StringType) {
-                        return (input, packed) -> input.readString();
+                        return (input, packed) -> {
+                            //return input.readString();
+                            byte[] bytes = input.readByteArray();
+                            return StringUtf8Utils.decodeUTF8(bytes, 0, bytes.length);
+                        };
                     } else {
                         throw new IllegalArgumentException(String.format("type:%s can not convert to type:%s", field.getType(), fieldDataType.simpleString()));
                     }
