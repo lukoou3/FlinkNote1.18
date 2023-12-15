@@ -1,14 +1,18 @@
 package com.java.flink.stream.proto.convert.formats;
 
 import com.alibaba.fastjson2.JSON;
+import com.google.common.primitives.Bytes;
 import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.Descriptors;
 import com.java.flink.stream.proto.convert.types.StructType;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.LineIterator;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.Test;
 
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
@@ -228,6 +232,46 @@ public class ProtobufJsonFileConvertTest {
 
     }
 
+    @Test
+    public void testOutJsonProtoFile() throws Exception{
+        String path = getClass().getResource("/protobuf/log_test.desc").getPath();
+        Descriptors.Descriptor descriptor = ProtobufUtils.buildDescriptor(
+                ProtobufUtils.readDescriptorFileContent(path),
+                "LogTest"
+        );
 
+        ProtobufSerializer serializer = new ProtobufSerializer(descriptor);
+        StructType structType = SchemaConverters.toStructType(descriptor);
+        SchemaConverters.MessageConverter messageConverter = new SchemaConverters.MessageConverter(descriptor, structType);
+
+        FileInputStream fileInputStream = new FileInputStream("D:\\doc\\datas\\session-record-completed.data");
+        LineIterator lineIterator = IOUtils.lineIterator(fileInputStream, StandardCharsets.UTF_8);
+        FileOutputStream osProto = new FileOutputStream("D:\\doc\\datas\\log_test.proto");
+        FileOutputStream osJson = new FileOutputStream("D:\\doc\\datas\\log_test.json");
+        final byte[] writeBuffer = new byte[4];
+        while (lineIterator.hasNext()){
+            String line = lineIterator.next();
+            Map<String, Object> map = JSON.parseObject(line);
+            byte[] bytes = serializer.serialize(map);
+            CodedInputStream input = CodedInputStream.newInstance(bytes);
+            Map<String, Object> data = messageConverter.converter(input);
+
+            bytes = serializer.serialize(data);
+            int len = bytes.length;
+            writeBuffer[3] = (byte) ((len >> 0)  & 0xFF);
+            writeBuffer[2] = (byte) ((len >> 8)  & 0xFF);
+            writeBuffer[1] = (byte) ((len >> 16) & 0xFF);
+            writeBuffer[0] = (byte) ((len >> 24) & 0xFF);
+            osProto.write(writeBuffer);
+            osProto.write(bytes);
+
+            bytes = JSON.toJSONBytes(data);
+            osJson.write(bytes);
+            osJson.write('\n');
+        }
+
+        osProto.close();
+        osJson.close();
+    }
 
 }

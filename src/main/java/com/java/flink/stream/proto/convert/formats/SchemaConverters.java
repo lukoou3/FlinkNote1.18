@@ -73,6 +73,7 @@ public class SchemaConverters {
 
     public static class MessageConverter {
         FieldDesc[] fieldDescArray; // Message类型对应FieldDesc, 下标为field number
+        int initialCapacity = 0;
 
         public MessageConverter(Descriptor descriptor, StructType dataType) {
             List<FieldDescriptor> fields = descriptor.getFields();
@@ -85,10 +86,13 @@ public class SchemaConverters {
                     fieldDescArray[field.getNumber()] = new FieldDesc(field, structFieldOptional.get().dataType);
                 }
             }
+            if(dataType.fields.length / 3 > 16){
+                initialCapacity = (dataType.fields.length / 3) ;
+            }
         }
 
         public Map<String, Object> converter(CodedInputStream input) throws Exception {
-            Map<String, Object> data = new HashMap<>();
+            Map<String, Object> data = initialCapacity == 0? new HashMap<>(): new HashMap<>(initialCapacity);
 
             while (true) {
                 int tag = input.readTag();

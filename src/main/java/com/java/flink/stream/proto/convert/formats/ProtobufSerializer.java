@@ -5,9 +5,8 @@ import com.google.protobuf.Descriptors.EnumValueDescriptor;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.WireFormat;
-import org.apache.flink.table.runtime.util.StringUtf8Utils;
 
-import java.nio.charset.StandardCharsets;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -230,7 +229,7 @@ public class ProtobufSerializer {
                 case INT32:
                     return () -> new Int32Data();
                 case UINT32:
-                    return () -> new Uint64Data();
+                    return () -> new Uint32Data();
                 case STRING:
                     return () -> new StringData();
                 case BYTES:
@@ -497,24 +496,39 @@ public class ProtobufSerializer {
         }
     }
 
+    static final int MAX_STR_BYTES_LENGTH = 1024 * 16;
     static class StringData extends ProtobufData {
+        private final byte[] bytes = new byte[MAX_STR_BYTES_LENGTH];
         private byte[] value;
+        private int len;
 
         @Override
         int getSerializedSize() {
-            return computeLengthDelimitedFieldSize(value.length);
+            return computeLengthDelimitedFieldSize(len);
         }
 
         @Override
         boolean feed(Object obj) throws Exception {
-            //value = obj.toString().getBytes(StandardCharsets.UTF_8);
-            value = StringUtf8Utils.encodeUTF8(obj.toString());
-            return value.length != 0;
+            String str = obj.toString();
+            if(str.isEmpty()){
+                return false;
+            }
+            //value = str.getBytes(StandardCharsets.UTF_8);
+            int length = str.length() * 3;
+            if (length > MAX_STR_BYTES_LENGTH) {
+                value = new byte[length];
+            }else{
+                value = bytes;
+            }
+
+            len = encodeUTF8(str, value);
+            return true;
         }
 
         @Override
         void writeTo(CodedOutputStream output) throws Exception {
-            output.writeByteArrayNoTag(value);
+            output.writeUInt32NoTag(len);
+            output.write(value, 0, len);
         }
     }
 
@@ -589,6 +603,85 @@ public class ProtobufSerializer {
         abstract boolean feed(Object obj) throws Exception;
 
         abstract void writeTo(CodedOutputStream output) throws Exception;
+    }
+
+    // copy from org.apache.flink.table.runtime.util.StringUtf8Utils
+    static int encodeUTF8(String str, byte[] bytes) {
+        int offset = 0;
+        int len = str.length();
+        int sl = offset + len;
+        int dp = 0;
+        int dlASCII = dp + Math.min(len, bytes.length);
+
+        // ASCII only optimized loop
+        while (dp < dlASCII && str.charAt(offset) < '\u0080') {
+            bytes[dp++] = (byte) str.charAt(offset++);
+        }
+
+        while (offset < sl) {
+            char c = str.charAt(offset++);
+            if (c < 0x80) {
+                // Have at most seven bits
+                bytes[dp++] = (byte) c;
+            } else if (c < 0x800) {
+                // 2 bytes, 11 bits
+                bytes[dp++] = (byte) (0xc0 | (c >> 6));
+                bytes[dp++] = (byte) (0x80 | (c & 0x3f));
+            } else if (Character.isSurrogate(c)) {
+                final int uc;
+                int ip = offset - 1;
+                if (Character.isHighSurrogate(c)) {
+                    if (sl - ip < 2) {
+                        uc = -1;
+                    } else {
+                        char d = str.charAt(ip + 1);
+                        if (Character.isLowSurrogate(d)) {
+                            uc = Character.toCodePoint(c, d);
+                        } else {
+                            // for some illegal character
+                            // the jdk will ignore the origin character and cast it to '?'
+                            // this acts the same with jdk
+                            return defaultEncodeUTF8(str, bytes);
+                        }
+                    }
+                } else {
+                    if (Character.isLowSurrogate(c)) {
+                        // for some illegal character
+                        // the jdk will ignore the origin character and cast it to '?'
+                        // this acts the same with jdk
+                        return defaultEncodeUTF8(str, bytes);
+                    } else {
+                        uc = c;
+                    }
+                }
+
+                if (uc < 0) {
+                    bytes[dp++] = (byte) '?';
+                } else {
+                    bytes[dp++] = (byte) (0xf0 | ((uc >> 18)));
+                    bytes[dp++] = (byte) (0x80 | ((uc >> 12) & 0x3f));
+                    bytes[dp++] = (byte) (0x80 | ((uc >> 6) & 0x3f));
+                    bytes[dp++] = (byte) (0x80 | (uc & 0x3f));
+                    offset++; // 2 chars
+                }
+            } else {
+                // 3 bytes, 16 bits
+                bytes[dp++] = (byte) (0xe0 | ((c >> 12)));
+                bytes[dp++] = (byte) (0x80 | ((c >> 6) & 0x3f));
+                bytes[dp++] = (byte) (0x80 | (c & 0x3f));
+            }
+        }
+        return dp;
+    }
+
+    static int defaultEncodeUTF8(String str, byte[] bytes) {
+        try {
+            byte[] buffer = str.getBytes("UTF-8");
+            System.arraycopy(buffer, 0, bytes, 0, buffer.length);
+            return buffer.length;
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException("encodeUTF8 error", e);
+        }
     }
 
     static final int TAG_TYPE_BITS = 3;

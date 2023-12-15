@@ -53,6 +53,7 @@ public class SimpleMessageProtosTest {
         data.put(fields.get(7).getName(), ByteString.copyFromUtf8("燕青丝"));
 
         byte[] bytes = null;
+        ///new HashMap<String, Object>().put();
 
         SimpleMessageJavaTypes deserializeData = SimpleMessageJavaTypes.parseFrom(bytes);
 
