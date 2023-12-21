@@ -226,10 +226,22 @@ public class ProtobufSerializer {
                     return () -> new Int64Data();
                 case UINT64:
                     return () -> new Uint64Data();
+                case FIXED64:
+                    return () -> new Fixed64Data();
+                case SFIXED64:
+                    return () -> new SFixed64Data();
+                case SINT64:
+                    return () -> new SInt64Data();
                 case INT32:
                     return () -> new Int32Data();
                 case UINT32:
                     return () -> new Uint32Data();
+                case FIXED32:
+                    return () -> new Fixed32Data();
+                case SFIXED32:
+                    return () -> new SFixed32Data();
+                case SINT32:
+                    return () -> new SInt32Data();
                 case STRING:
                     return () -> new StringData();
                 case BYTES:
@@ -456,6 +468,66 @@ public class ProtobufSerializer {
         }
     }
 
+    static class Fixed32Data extends ProtobufData {
+        private int value;
+
+        @Override
+        int getSerializedSize() {
+            return CodedOutputStream.computeFixed32SizeNoTag(value);
+        }
+
+        @Override
+        boolean feed(Object obj) throws Exception {
+            value = convertToInt(obj);
+            return value != 0;
+        }
+
+        @Override
+        void writeTo(CodedOutputStream output) throws Exception {
+            output.writeFixed32NoTag(value);
+        }
+    }
+
+    static class SFixed32Data extends ProtobufData {
+        private int value;
+
+        @Override
+        int getSerializedSize() {
+            return CodedOutputStream.computeSFixed32SizeNoTag(value);
+        }
+
+        @Override
+        boolean feed(Object obj) throws Exception {
+            value = convertToInt(obj);
+            return value != 0;
+        }
+
+        @Override
+        void writeTo(CodedOutputStream output) throws Exception {
+            output.writeSFixed32NoTag(value);
+        }
+    }
+
+    static class SInt32Data extends ProtobufData {
+        private int value;
+
+        @Override
+        int getSerializedSize() {
+            return CodedOutputStream.computeSInt32SizeNoTag(value);
+        }
+
+        @Override
+        boolean feed(Object obj) throws Exception {
+            value = convertToInt(obj);
+            return value != 0;
+        }
+
+        @Override
+        void writeTo(CodedOutputStream output) throws Exception {
+            output.writeSInt32NoTag(value);
+        }
+    }
+
     static class Int64Data extends ProtobufData {
         private long value;
 
@@ -493,6 +565,66 @@ public class ProtobufSerializer {
         @Override
         void writeTo(CodedOutputStream output) throws Exception {
             output.writeUInt64NoTag(value);
+        }
+    }
+
+    static class Fixed64Data extends ProtobufData {
+        private long value;
+
+        @Override
+        int getSerializedSize() {
+            return CodedOutputStream.computeFixed64SizeNoTag(value);
+        }
+
+        @Override
+        boolean feed(Object obj) throws Exception {
+            value = convertToLong(obj);
+            return value != 0L;
+        }
+
+        @Override
+        void writeTo(CodedOutputStream output) throws Exception {
+            output.writeFixed64NoTag(value);
+        }
+    }
+
+    static class SFixed64Data extends ProtobufData {
+        private long value;
+
+        @Override
+        int getSerializedSize() {
+            return CodedOutputStream.computeSFixed64SizeNoTag(value);
+        }
+
+        @Override
+        boolean feed(Object obj) throws Exception {
+            value = convertToLong(obj);
+            return value != 0L;
+        }
+
+        @Override
+        void writeTo(CodedOutputStream output) throws Exception {
+            output.writeSFixed64NoTag(value);
+        }
+    }
+
+    static class SInt64Data extends ProtobufData {
+        private long value;
+
+        @Override
+        int getSerializedSize() {
+            return CodedOutputStream.computeSInt64SizeNoTag(value);
+        }
+
+        @Override
+        boolean feed(Object obj) throws Exception {
+            value = convertToLong(obj);
+            return value != 0L;
+        }
+
+        @Override
+        void writeTo(CodedOutputStream output) throws Exception {
+            output.writeSInt64NoTag(value);
         }
     }
 
