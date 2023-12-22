@@ -301,6 +301,75 @@ public class SchemaConverters {
             return data;
         }
 
+        public Map<String, Object> converter3(CodedInputStream input) throws Exception {
+            return emitDefaultValues ? converter(input): converter2(input);
+        }
+
+        public Map<String, Object> converter2(CodedInputStream input) throws Exception {
+            Map<String, Object> data = initialCapacity == 0? new HashMap<>(): new HashMap<>(initialCapacity);
+
+            while (true) {
+                int tag = input.readTag();
+                if (tag == 0) {
+                    break;
+                }
+
+                final int wireType = WireFormat.getTagWireType(tag);
+                final int fieldNumber = WireFormat.getTagFieldNumber(tag);
+
+                FieldDesc fieldDesc = null;
+                if (fieldNumber < fieldDescArray.length) {
+                    fieldDesc = fieldDescArray[fieldNumber];
+                }
+
+                boolean unknown = false;
+                boolean packed = false;
+                if (fieldDesc == null) {
+                    unknown = true; // Unknown field.
+                } else if (wireType == fieldDesc.field.getLiteType().getWireType()) {
+                    packed = false;
+                } else if (fieldDesc.field.isPackable() && wireType == WireFormat.WIRETYPE_LENGTH_DELIMITED) {
+                    packed = true;
+                } else {
+                    unknown = true; // Unknown wire type.
+                }
+
+                if (unknown) { // Unknown field or wrong wire type.  Skip.
+                    input.skipField(tag);
+                    continue;
+                }
+
+                String name = fieldDesc.name;
+                if (packed) {
+                    final int length = input.readRawVarint32();
+                    final int limit = input.pushLimit(length);
+                    List<Object> array = (List<Object>) fieldDesc.valueConverter.convert(input, true);
+                    input.popLimit(limit);
+                    List<Object> oldArray = (List<Object>)data.get(name);
+                    if(oldArray == null){
+                        data.put(name, array);
+                    }else{
+                        oldArray.addAll(array);
+                    }
+                } else {
+                    final Object value = fieldDesc.valueConverter.convert(input, false);
+                    if(!fieldDesc.field.isRepeated()){
+                        data.put(name, value);
+                    }else{
+                        List<Object> array = (List<Object>)data.get(name);
+                        if(array == null){
+                            array = new ArrayList<>();
+                            data.put(name, array);
+                        }
+                        array.add(value);
+                    }
+                }
+
+            }
+
+            return data;
+        }
+
         private Object getDefaultValue(FieldDescriptor field, DataType fieldDataType){
             if(field.getJavaType() == Descriptors.FieldDescriptor.JavaType.MESSAGE){
                 return null;
