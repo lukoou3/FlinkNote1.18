@@ -37,7 +37,7 @@ public class Types {
         return new StructType(fields);
     }
 
-    static DataType parseDataType(String type){
+    public static DataType parseDataType(String type){
         type = type.trim();
         if("int".equalsIgnoreCase(type)){
            return INT;
@@ -49,6 +49,10 @@ public class Types {
             return FLOAT;
         } else if ("double".equalsIgnoreCase(type)){
             return DOUBLE;
+        } else if ("boolean".equalsIgnoreCase(type)){
+            return BOOLEAN;
+        } else if ("binary".equalsIgnoreCase(type)){
+            return BINARY;
         }
 
         // array类型

@@ -74,6 +74,14 @@ public class StructType extends DataType {
                 Types.buildFormattedString(dataType, prefix + "    |", sb, maxDepth);
             }
         }
+
+        @Override
+        public String toString() {
+            return "StructField{" +
+                    "name='" + name + '\'' +
+                    ", dataType=" + dataType +
+                    '}';
+        }
     }
 
 }
