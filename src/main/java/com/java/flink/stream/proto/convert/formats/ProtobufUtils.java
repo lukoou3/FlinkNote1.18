@@ -6,6 +6,7 @@ import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.FileDescriptor;
 import com.google.protobuf.ProtocolStringList;
 import org.apache.commons.io.FileUtils;
+import org.apache.flink.util.Preconditions;
 
 import java.io.File;
 import java.io.IOException;
@@ -15,6 +16,19 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 public class ProtobufUtils {
+
+    public static boolean isProto3(Descriptor descriptor){
+        return descriptor.getFile().getSyntax() == FileDescriptor.Syntax.PROTO3;
+    }
+
+    public static boolean isMessageSetWireFormat(Descriptor descriptor){
+        return descriptor.getOptions().getMessageSetWireFormat();
+    }
+
+    public static void checkSupportParseDescriptor(Descriptor descriptor){
+        Preconditions.checkArgument(isProto3(descriptor), "only support proto3");
+        Preconditions.checkArgument(!isMessageSetWireFormat(descriptor), "not support message_set_wire_format option");
+    }
 
     public static byte[] readDescriptorFileContent(String filePath)  {
         try {
@@ -32,7 +46,7 @@ public class ProtobufUtils {
         return descriptor;
     }
 
-    public static List<FileDescriptor> parseFileDescriptorSet(byte[] bytes) throws Exception{
+    private static List<FileDescriptor> parseFileDescriptorSet(byte[] bytes) throws Exception{
         DescriptorProtos.FileDescriptorSet fileDescriptorSet = DescriptorProtos.FileDescriptorSet.parseFrom(bytes);
         Map<String, DescriptorProtos.FileDescriptorProto> fileDescriptorProtoMap = fileDescriptorSet.getFileList().stream().collect(Collectors.toMap(x -> x.getName(), x -> x));
         List<FileDescriptor> fileDescriptorList = new ArrayList<>();

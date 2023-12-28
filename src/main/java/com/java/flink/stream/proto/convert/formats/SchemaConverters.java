@@ -175,6 +175,7 @@ public class SchemaConverters {
         }
 
         public MessageConverter(Descriptor descriptor, StructType dataType, boolean emitDefaultValues) {
+            ProtobufUtils.checkSupportParseDescriptor(descriptor);
             List<FieldDescriptor> fields = descriptor.getFields();
             int maxNumber = fields.stream().mapToInt(f -> f.getNumber()).max().getAsInt();
             Preconditions.checkArgument(maxNumber < 10000, maxNumber);

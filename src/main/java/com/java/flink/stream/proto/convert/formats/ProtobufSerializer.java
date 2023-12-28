@@ -17,6 +17,7 @@ public class ProtobufSerializer {
     final MessageData messageData;
 
     public ProtobufSerializer(Descriptor descriptor) {
+        ProtobufUtils.checkSupportParseDescriptor(descriptor);
         messageData = new MessageData(descriptor);
     }
 
@@ -643,6 +644,8 @@ public class ProtobufSerializer {
         boolean feed(Object obj) throws Exception {
             String str = obj.toString();
             if(str.isEmpty()){
+                value = bytes;
+                len = 0;
                 return false;
             }
             //value = str.getBytes(StandardCharsets.UTF_8);

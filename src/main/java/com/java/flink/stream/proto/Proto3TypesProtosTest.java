@@ -50,8 +50,12 @@ public class Proto3TypesProtosTest {
     @Test
     public void testProto3TypesDynamicMessage() throws Exception{
         Descriptors.Descriptor descriptor = Proto3Types.getDescriptor();
+        System.out.println(descriptor.getFile().getSyntax() == Descriptors.FileDescriptor.Syntax.PROTO3);
         System.out.println(descriptor.getFile().getSyntax());
+        System.out.println();
         System.out.println(descriptor.getFile().toProto().getSyntax());
+        System.out.println(Descriptors.FileDescriptor.Syntax.PROTO3.name());
+        System.out.println(Descriptors.FileDescriptor.Syntax.PROTO3.name().equals(descriptor.getFile().toProto().getSyntax()));
         Descriptors.EnumDescriptor enumDescriptor = descriptor.getEnumTypes().get(0);
         DynamicMessage structMessage = DynamicMessage.newBuilder(StructMessage.getDescriptor())
                 .setField(StructMessage.getDescriptor().getFields().get(0), 1L)
