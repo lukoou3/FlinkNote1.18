@@ -14,6 +14,8 @@ import static org.apache.flink.shaded.guava31.com.google.common.base.Preconditio
  * rest.bind-port: 8081,8082,8083
  * 通过测试，StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf)和new MiniCluster(miniClusterConfig)都可以实现跳过占用的端口
  * 测试这个是因为在jupyter中启动flink时，默认的配置文件是单个端口，只能同时运行一个notebook，配置多端口可以同时运行多个notebook
+ *
+ * 启动绑定端口逻辑在org.apache.flink.runtime.rest.RestServerEndpoint#start()方法，配置多个端口，发生java.net.BindException异常会尝试下一个端口。
  */
 public class PortBindTest {
 
@@ -25,7 +27,24 @@ public class PortBindTest {
             manyPortStartup();
         } else if (args[0].equals("3")) {
             manyPortStartupMiniCluster();
+        }else if (args[0].equals("4")) {
+            onePortStartup();
         }
+    }
+
+    public static void onePortStartup() throws Exception {
+        Configuration conf = new Configuration();
+        conf.setString("rest.bind-port", "8081");
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment(conf);
+        env.setParallelism(1);
+
+        DataStream<String> text = env.fromElements("1", "2", "3");
+        text.map(ele -> {
+            Thread.sleep(1000 * 60 * 5);
+            return ele;
+        }).print();
+
+        env.execute("PortBindTest");
     }
 
     public static void normalStartup() throws Exception {
