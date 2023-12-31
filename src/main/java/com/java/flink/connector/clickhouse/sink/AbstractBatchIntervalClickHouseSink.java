@@ -153,7 +153,7 @@ public abstract class AbstractBatchIntervalClickHouseSink<T> extends RichSinkFun
         for (int i = 0; i < columnNames.length; i++) {
             IColumn column = block.getColumn(i);
             columnTypes[i] = column.type();
-            assert columnNames[i] == column.name();
+            assert columnNames[i].equals(column.name());
 
             if (column.type() instanceof DataTypeString
                     || column.type() instanceof DataTypeFixedString) {

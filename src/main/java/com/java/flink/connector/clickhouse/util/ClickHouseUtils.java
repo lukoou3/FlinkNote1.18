@@ -74,6 +74,7 @@ public class ClickHouseUtils {
     public static String genePreparedInsertSql(String table, String[] columnNames) {
         StringBuilder sb = new StringBuilder("insert into ");
         sb.append(table).append("(");
+        //sb.append(String.join(",", Arrays.stream(columnNames).map(x -> "`" + x +"`").collect(Collectors.toList())));
         sb.append(String.join(",", columnNames));
         sb.append(")");
         sb.append(" values(");
