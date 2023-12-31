@@ -24,7 +24,7 @@ public class FieldGeneUtils {
                     gene = new IntGeneRandom(
                             fields.getString("name"),
                             fields.getIntValue("start", 0),
-                            fields.getIntValue("end", Integer.MAX_VALUE),
+                            fields.getIntValue("end", Integer.MAX_VALUE - 1),
                             Optional.ofNullable(fields.getDouble("null_ratio")).orElse(0D)
                     );
                     break;
@@ -39,8 +39,15 @@ public class FieldGeneUtils {
                     gene = new LongGeneRandom(
                             fields.getString("name"),
                             fields.getLongValue("start", 0),
-                            fields.getLongValue("end", Long.MAX_VALUE),
+                            fields.getLongValue("end", Long.MAX_VALUE - 1),
                             Optional.ofNullable(fields.getDouble("null_ratio")).orElse(0D)
+                    );
+                    break;
+                case "long_inc_batch":
+                    gene = new LongGeneIncBatch(
+                            fields.getString("name"),
+                            fields.getLongValue("start", 0),
+                            fields.getIntValue("batch", 10)
                     );
                     break;
                 case "str_fix":
@@ -56,6 +63,16 @@ public class FieldGeneUtils {
                             fields.getIntValue("random", 0) == 1
                     );
                     break;
+                case "str_list_from_list":
+                    gene = new StringListGeneFromList(
+                            fields.getString("name"),
+                            fields.getList("values", String.class),
+                            fields.getIntValue("minSize", 0),
+                            fields.getIntValue("maxSize", 2),
+                            fields.getIntValue("duplicated", 0) == 1
+                    );
+                    break;
+
                 default:
                     throw new RuntimeException(type);
             }
