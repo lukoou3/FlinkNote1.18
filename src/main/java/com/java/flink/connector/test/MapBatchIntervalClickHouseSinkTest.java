@@ -77,6 +77,16 @@ show create table test.test_ck_sink_local;
  */
 public class MapBatchIntervalClickHouseSinkTest {
 
+    /**
+     * AbstractBatchIntervalClickHouseSink 优化gc的主要考虑是：
+     *     如果使用batch list 缓存，gc压力会比较大
+     *     所以考虑把batch写入buffer，buffer复用。减少gc。考虑到需要进行失败重试，所以把Block缓存。使用反射替换Block内容。
+     *     Block里面的列也就是IColumn类对象，IColumn的是从缓存池中申请的ColumnWriterBuffer buffer，会归还。归还就会复用。不归还ColumnWriterBuffer buffer就会被gc释放，不影响，不会内存泄漏。
+     *     缓冲池使用的是ConcurrentLinkedDeque<ColumnWriterBuffer>，放入才会缓存，申请会从队列删除，不归还不会内存泄漏，申请没有限制，队列中没有对象会申请创建。
+     *     ck sink close函数中缓存的Block不用归还释放列IColumn申请的ColumnWriterBuffer，会被gc。
+     *     ConcurrentLinkedDeque<ColumnWriterBuffer> stack 缓存池没有记录列表总大小，使用大小等信息，没限制列表大小。不归还ColumnWriterBuffer没问题。
+     *
+     */
     @Test
     public void testClickHouseSink() throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();

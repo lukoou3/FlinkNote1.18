@@ -318,9 +318,12 @@ public abstract class AbstractBatchIntervalClickHouseSink<T> extends RichSinkFun
             if (lock != null) {
                 lock.lock();
                 try {
-                    if (batch.rowCnt() > 0) {
+                    // batch init中可能抛出异常
+                    if (batch != null && batch.rowCnt() > 0) {
                         doFlushAndResetBlock(batch, false);
                     }
+                    // 缓存的Block不用归还释放列IColumn申请的ColumnWriterBuffer，会被gc。
+                    // ConcurrentLinkedDeque<ColumnWriterBuffer> stack 缓存池没有记录列表总大小，使用大小等信息，没限制列表大小。不归还ColumnWriterBuffer没问题。
                 } catch (Exception e) {
                     flushException = e;
                 } finally {
