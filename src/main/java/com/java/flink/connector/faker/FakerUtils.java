@@ -1,5 +1,8 @@
 package com.java.flink.connector.faker;
 
+import org.apache.flink.table.data.*;
+import org.apache.flink.table.types.logical.*;
+
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.Instant;
@@ -10,22 +13,16 @@ import java.time.temporal.ChronoField;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
-import org.apache.flink.table.data.DecimalData;
-import org.apache.flink.table.data.GenericArrayData;
-import org.apache.flink.table.data.GenericMapData;
-import org.apache.flink.table.data.GenericRowData;
-import org.apache.flink.table.data.StringData;
-import org.apache.flink.table.data.TimestampData;
-import org.apache.flink.table.types.logical.*;
 
 public class FakerUtils {
 
   private static final DateTimeFormatter FORMATTER =
-      new DateTimeFormatterBuilder()
-          // Pattern was taken from java.sql.Timestamp#toString
-          .appendPattern("uuuu-MM-dd HH:mm:ss")
-          .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
-          .toFormatter(Locale.US);
+          new DateTimeFormatterBuilder()
+                  // Pattern was taken from java.sql.Timestamp#toString
+                  //.appendPattern("uuuu-MM-dd HH:mm:ss")
+                  .appendPattern("yyyy-MM-dd HH:mm:ss")
+                  .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
+                  .toFormatter(Locale.US);
 
   static Object stringValueToType(String[] stringArray, LogicalType logicalType) {
     String value = stringArray.length > 0 ? stringArray[0] : "";
@@ -47,7 +44,7 @@ public class FakerUtils {
       case INTEGER:
         return Integer.parseInt(value);
       case BIGINT:
-        return Long.valueOf(value);
+        return Long.parseLong(value);
       case FLOAT:
         return Float.parseFloat(value);
       case DOUBLE:
@@ -69,12 +66,27 @@ public class FakerUtils {
         //      case INTERVAL_DAY_TIME:
         //        break;
       case ARRAY:
-        Object[] arrayElements = new Object[stringArray.length];
-        for (int i = 0; i < stringArray.length; i++)
-          arrayElements[i] =
-              (stringValueToType(
-                  new String[] {stringArray[i]}, ((ArrayType) logicalType).getElementType()));
-        return new GenericArrayData(arrayElements);
+        if(((ArrayType) logicalType).getElementType().getTypeRoot() == LogicalTypeRoot.ROW){
+          int fieldSize = ((RowType)((ArrayType)logicalType).getElementType()).getFields().size();
+          Object[] arrayElements = new Object[stringArray.length / fieldSize];
+          for (int i = 0; i < arrayElements.length; i += 1){
+            String[] valueArray = new String[fieldSize];
+            for (int j = 0; j < fieldSize; j += 1){
+              valueArray[j] = stringArray[i * fieldSize + j];
+            }
+            arrayElements[i] =
+                    (stringValueToType(
+                            valueArray, ((ArrayType) logicalType).getElementType()));
+          }
+          return new GenericArrayData(arrayElements);
+        }else{
+          Object[] arrayElements = new Object[stringArray.length];
+          for (int i = 0; i < stringArray.length; i++)
+            arrayElements[i] =
+                    (stringValueToType(
+                            new String[] {stringArray[i]}, ((ArrayType) logicalType).getElementType()));
+          return new GenericArrayData(arrayElements);
+        }
       case MULTISET:
         Map<Object, Integer> multisetMap = new HashMap<>();
         for (int i = 0; i < stringArray.length; i++) {

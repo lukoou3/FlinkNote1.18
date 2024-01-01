@@ -47,6 +47,26 @@
             <scope>${libs.online.scope}</scope>
         </dependency>
 
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-streaming-scala_2.12</artifactId>
+            <version>${flink.version}</version>
+            <scope>${libs.online.scope}</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.scalatest</groupId>
+            <artifactId>scalatest_2.12</artifactId>
+            <version>3.2.3</version>
+            <scope>${libs.online.scope}</scope>
+            <!--<exclusions>
+                <exclusion>
+                    <groupId>org.scalactic</groupId>
+                    <artifactId>scalactic_2.11</artifactId>
+                </exclusion>
+            </exclusions>-->
+        </dependency>
+
         <!-- This dependency is provided, because it should not be packaged into the JAR file. -->
         <dependency>
             <groupId>org.apache.flink</groupId>
@@ -78,6 +98,13 @@
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-table-runtime</artifactId>
+            <version>${flink.version}</version>
+            <scope>${libs.online.scope}</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-table-planner_2.12</artifactId>
             <version>${flink.version}</version>
             <scope>${libs.online.scope}</scope>
         </dependency>
@@ -142,6 +169,12 @@
         </dependency>
 
         <dependency>
+            <groupId>net.datafaker</groupId>
+            <artifactId>datafaker</artifactId>
+            <version>1.9.0</version>
+        </dependency>
+
+        <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <version>4.13.2</version>
@@ -181,6 +214,28 @@
                 <configuration>
                     <source>${target.java.version}</source>
                     <target>${target.java.version}</target>
+                </configuration>
+            </plugin>
+
+            <!-- Scala Compiler -->
+            <plugin>
+                <groupId>net.alchim31.maven</groupId>
+                <artifactId>scala-maven-plugin</artifactId>
+                <version>3.2.2</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>compile</goal>
+                            <goal>testCompile</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <args>
+                        <arg>-nobootcp</arg>
+                    </args>
+                    <!--flink1.18依赖的是scala2.12-->
+                    <!--<addScalacArgs>-target:jvm-1.8</addScalacArgs>-->
                 </configuration>
             </plugin>
 

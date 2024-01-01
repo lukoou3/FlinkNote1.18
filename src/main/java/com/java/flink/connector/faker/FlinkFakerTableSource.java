@@ -1,7 +1,5 @@
 package com.java.flink.connector.faker;
 
-import static com.java.flink.connector.faker.FlinkFakerTableSourceFactory.UNLIMITED_ROWS;
-
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.connector.source.lib.NumberSequenceSource;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -19,6 +17,8 @@ import org.apache.flink.table.functions.LookupFunction;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalType;
 
+import static com.java.flink.connector.faker.FlinkFakerTableSourceFactory.UNLIMITED_ROWS;
+
 public class FlinkFakerTableSource
     implements ScanTableSource, LookupTableSource, SupportsLimitPushDown {
 
@@ -29,6 +29,7 @@ public class FlinkFakerTableSource
   private final LogicalType[] types;
   private long rowsPerSecond;
   private long numberOfRows;
+  private long sleepPerRow;
 
   public FlinkFakerTableSource(
       String[][] fieldExpressions,
@@ -36,11 +37,13 @@ public class FlinkFakerTableSource
       Integer[] fieldCollectionLengths,
       ResolvedSchema schema,
       long rowsPerSecond,
-      long numberOfRows) {
+      long numberOfRows,
+      long sleepPerRow) {
     this.fieldExpressions = fieldExpressions;
     this.fieldNullRates = fieldNullRates;
     this.fieldCollectionLengths = fieldCollectionLengths;
     this.schema = schema;
+    // LogicalType
     types =
         schema.getColumns().stream()
             .filter(column -> column.isPhysical())
@@ -49,6 +52,7 @@ public class FlinkFakerTableSource
             .toArray(LogicalType[]::new);
     this.rowsPerSecond = rowsPerSecond;
     this.numberOfRows = numberOfRows;
+    this.sleepPerRow = sleepPerRow;
   }
 
   @Override
@@ -58,14 +62,16 @@ public class FlinkFakerTableSource
 
   @Override
   public ScanRuntimeProvider getScanRuntimeProvider(final ScanContext scanContext) {
-    boolean isBounded = numberOfRows != UNLIMITED_ROWS;
+    //boolean isBounded = numberOfRows != UNLIMITED_ROWS;
+    boolean isBounded = false;
 
     return new DataStreamScanProvider() {
       @Override
       public DataStream<RowData> produceDataStream(
-          ProviderContext providerContext, StreamExecutionEnvironment env) {
+              ProviderContext providerContext, StreamExecutionEnvironment env) {
 
-        long to = isBounded ? numberOfRows : Long.MAX_VALUE;
+        //long to = isBounded ? numberOfRows : Long.MAX_VALUE;
+        long to = numberOfRows != UNLIMITED_ROWS ? numberOfRows : Long.MAX_VALUE;
         DataStreamSource<Long> sequence =
             env.fromSource(
                 new NumberSequenceSource(1, to),
@@ -92,7 +98,9 @@ public class FlinkFakerTableSource
         fieldCollectionLengths,
         schema,
         rowsPerSecond,
-        numberOfRows);
+        numberOfRows,
+        sleepPerRow
+    );
   }
 
   @Override
@@ -102,15 +110,33 @@ public class FlinkFakerTableSource
 
   @Override
   public LookupRuntimeProvider getLookupRuntimeProvider(LookupContext context) {
+    /**
+     * context.getKeys()返回 int[][]，代表关联key的位置, [最外部列的位置, row类型关联内部属性的位置]
+     * 大多数情况下不支持row的属性进行关联, 这种情况keys实际就是一维数组
+     *    例如表的类型 a int, b int, c int, d int
+     *    关联的条件是a, 则keys = [[0]]
+     *    关联的条件是a和b, 则keys = [[0], [1]]
+     *
+     *    例如表的类型 i INT, s STRING, r ROW < i2 INT, s2 STRING >
+     *    关联的条件是i和s2, 则keys = [[0], [2, 1]]
+     *
+     */
     return new LookupFunctionProvider() {
       @Override
       public LookupFunction createLookupFunction() {
         return new FlinkFakerLookupFunction(
-            fieldExpressions, fieldNullRates, fieldCollectionLengths, types, context.getKeys());
+                fieldExpressions, fieldNullRates, fieldCollectionLengths, types, context.getKeys());
       }
     };
+    /*return TableFunctionProvider.of(
+        new FlinkFakerLookupFunction(
+            fieldExpressions, fieldNullRates, fieldCollectionLengths, types, context.getKeys()));*/
   }
 
+  /**
+   * 支持limit下推
+   * @param limit
+   */
   @Override
   public void applyLimit(long limit) {
     this.numberOfRows = limit;

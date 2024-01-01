@@ -1,12 +1,5 @@
 package com.java.flink.connector.faker;
 
-import static org.apache.flink.configuration.ConfigOptions.key;
-
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 import net.datafaker.Faker;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
@@ -15,8 +8,17 @@ import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import static org.apache.flink.configuration.ConfigOptions.key;
 
 public class FlinkFakerTableSourceFactory implements DynamicTableSourceFactory {
 
@@ -41,6 +43,12 @@ public class FlinkFakerTableSourceFactory implements DynamicTableSourceFactory {
           .longType()
           .defaultValue(UNLIMITED_ROWS)
           .withDescription("Total number of rows to emit. By default, the source is unbounded.");
+
+  public static final ConfigOption<Long> SLEEP_PER_ROW =
+          key("sleep-per-row")
+                  .longType()
+                  .defaultValue(0L)
+                  .withDescription("sleep per row to control the emit rate.");
 
   public static final List<LogicalTypeRoot> SUPPORTED_ROOT_TYPES =
       Arrays.asList(
@@ -67,14 +75,14 @@ public class FlinkFakerTableSourceFactory implements DynamicTableSourceFactory {
   public static final List<LogicalTypeRoot> COLLECTION_ROOT_TYPES =
       Arrays.asList(LogicalTypeRoot.ARRAY, LogicalTypeRoot.MAP, LogicalTypeRoot.MULTISET);
 
-  private static final Faker FAKER = new Faker();
-
   @Override
   public FlinkFakerTableSource createDynamicTableSource(final Context context) {
 
     Configuration options = new Configuration();
     context.getCatalogTable().getOptions().forEach(options::setString);
 
+    // 物理列, 排除到计算列, 计算列flink实现
+    // TableSchema schema = TableSchemaUtils.getPhysicalSchema(catalogTable.getSchema());
     ResolvedSchema schema = context.getCatalogTable().getResolvedSchema();
     List<Column> physicalColumns =
         schema.getColumns().stream()
@@ -101,11 +109,13 @@ public class FlinkFakerTableSourceFactory implements DynamicTableSourceFactory {
         fieldCollectionLengths,
         schema,
         options.get(ROWS_PER_SECOND),
-        options.get(NUMBER_OF_ROWS));
+        options.get(NUMBER_OF_ROWS),
+        options.get(SLEEP_PER_ROW)
+    );
   }
 
   private Integer readAndValidateCollectionLength(
-      Configuration options, String fieldName, DataType dataType) {
+          Configuration options, String fieldName, DataType dataType) {
     ConfigOption<Integer> collectionLength =
         key(FIELDS + "." + fieldName + "." + COLLECTION_LENGTH).intType().defaultValue(1);
     Integer fieldCollectionLength = options.get(collectionLength);
@@ -144,7 +154,7 @@ public class FlinkFakerTableSourceFactory implements DynamicTableSourceFactory {
   }
 
   private String[] readAndValidateFieldExpression(
-      Configuration options, String fieldName, DataType dataType) {
+          Configuration options, String fieldName, DataType dataType) {
     String[] fieldExpression;
 
     if (dataType.getLogicalType().getTypeRoot() == LogicalTypeRoot.MAP) {
@@ -155,8 +165,21 @@ public class FlinkFakerTableSourceFactory implements DynamicTableSourceFactory {
           key(FIELDS + "." + fieldName + ".value." + EXPRESSION).stringType().noDefaultValue();
       fieldExpression = new String[] {options.get(keyExpression), options.get(valueExpression)};
 
-    } else if (dataType.getLogicalType().getTypeRoot() == LogicalTypeRoot.ROW) {
-      List<RowType.RowField> rowFields = ((RowType) dataType.getLogicalType()).getFields();
+    } else if (
+            dataType.getLogicalType().getTypeRoot() == LogicalTypeRoot.ROW
+            || (
+                    dataType.getLogicalType().getTypeRoot() == LogicalTypeRoot.ARRAY &&
+                            ((ArrayType)dataType.getLogicalType()).getElementType().getTypeRoot() == LogicalTypeRoot.ROW
+                    )
+    ) {
+      StringBuilder stringBuilder = new StringBuilder();
+      List<RowType.RowField> rowFields = null;
+      if(dataType.getLogicalType().getTypeRoot() == LogicalTypeRoot.ROW){
+        rowFields = ((RowType) dataType.getLogicalType()).getFields();
+      }else{
+        rowFields = ((RowType)((ArrayType)dataType.getLogicalType()).getElementType()).getFields();
+      }
+
       fieldExpression = new String[rowFields.size()];
       // expression is given element by element
       for (int i = 0; i < rowFields.size(); i++) {
@@ -183,7 +206,8 @@ public class FlinkFakerTableSourceFactory implements DynamicTableSourceFactory {
     }
 
     try {
-      for (String expression : fieldExpression) FAKER.expression(expression);
+      Faker faker = new Faker();
+      for (String expression : fieldExpression) faker.expression(expression);
     } catch (RuntimeException e) {
       throw new ValidationException("Invalid expression for column \"" + fieldName + "\".", e);
     }
@@ -218,6 +242,7 @@ public class FlinkFakerTableSourceFactory implements DynamicTableSourceFactory {
     Set<ConfigOption<?>> options = new HashSet<>();
     options.add(ROWS_PER_SECOND);
     options.add(NUMBER_OF_ROWS);
+    options.add(SLEEP_PER_ROW);
     return options;
   }
 }

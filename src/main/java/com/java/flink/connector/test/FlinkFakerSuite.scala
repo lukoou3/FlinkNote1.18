@@ -97,4 +97,46 @@ class FlinkFakerSuite extends FlinkJavaBaseSuite {
 
     rstTable.execute().print()
   }
+
+  /**
+   * '#{date.past ''15'',''SECONDS''}'
+   * 生成过去最多15秒的时间戳，也就是说生成的时间戳范围：[ts-15, ts]
+   * '#{date.past ''15'',''5'',''SECONDS''}'
+   * 生成过去最多15秒但至少5秒的时间戳，也就是说生成的时间戳范围：[ts-15, ts-5]
+   * '#{date.past ''2'',''0'',''SECONDS''}',
+   * 生成过去最多2秒的时间戳，也就是说生成的时间戳范围：[ts-2, ts]
+   * TIMESTAMP 没有时区的时间，字符串显示的utc的时间字符串
+   * TIMESTAMP_LTZ 带时区的时间，字符串显示的本地的时间字符串
+   */
+  test("geneTimestamp"){
+    var sql = """
+    CREATE TEMPORARY TABLE tmp_tb (
+      `timestamp1` TIMESTAMP(3),
+      `timestamp2` TIMESTAMP(3),
+      `timestamp3` TIMESTAMP(3),
+      `timestamp_ltz1` TIMESTAMP_LTZ (3),
+      `timestamp_ltz2` TIMESTAMP_LTZ (3),
+      `timestamp_ltz3` TIMESTAMP_LTZ (3),
+      proc_time AS PROCTIME()
+    ) WITH (
+      'connector' = 'faker',
+      'fields.timestamp1.expression' = '#{date.past ''15'',''SECONDS''}',
+      'fields.timestamp2.expression' = '#{date.past ''15'',''5'',''SECONDS''}',
+      'fields.timestamp3.expression' = '#{date.past ''2'',''0'',''SECONDS''}',
+      'fields.timestamp_ltz1.expression' = '#{date.past ''15'',''SECONDS''}',
+      'fields.timestamp_ltz2.expression' = '#{date.past ''15'',''5'',''SECONDS''}',
+      'fields.timestamp_ltz3.expression' = '#{date.past ''2'',''0'',''SECONDS''}',
+      'rows-per-second' = '1'
+    )
+    """
+    tEnv.executeSql(sql)
+
+    sql = """
+    select * from tmp_tb
+    """
+    val rstTable = tEnv.sqlQuery(sql)
+    rstTable.printSchema()
+
+    rstTable.execute().print()
+  }
 }

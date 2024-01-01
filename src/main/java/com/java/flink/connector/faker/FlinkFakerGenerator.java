@@ -1,7 +1,5 @@
 package com.java.flink.connector.faker;
 
-import java.util.ArrayList;
-import java.util.List;
 import net.datafaker.Faker;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.functions.RichFlatMapFunction;
@@ -11,15 +9,21 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.util.Collector;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+
 class FlinkFakerGenerator extends RichFlatMapFunction<Long, RowData> {
 
   private Faker faker;
+  private Random rand;
 
   private String[][] fieldExpressions;
   private Float[] fieldNullRates;
   private Integer[] fieldCollectionLengths;
   private LogicalType[] types;
   private long rowsPerSecond;
+  private long sleepPerRow;
   private long soFarThisSecond;
   private long nextReadTime;
 
@@ -34,12 +38,14 @@ class FlinkFakerGenerator extends RichFlatMapFunction<Long, RowData> {
     this.fieldCollectionLengths = fieldCollectionLengths;
     this.types = types;
     this.rowsPerSecond = rowsPerSecond;
+    this.sleepPerRow = sleepPerRow;
   }
 
   @Override
   public void open(final Configuration parameters) throws Exception {
     super.open(parameters);
     faker = new Faker();
+    rand = new Random();
 
     nextReadTime = System.currentTimeMillis();
     soFarThisSecond = 0;
@@ -47,13 +53,17 @@ class FlinkFakerGenerator extends RichFlatMapFunction<Long, RowData> {
 
   @Override
   public void flatMap(Long trigger, Collector<RowData> collector) throws Exception {
+    // 生成row
     collector.collect(generateNextRow());
     recordAndMaybeRest();
   }
 
   private void recordAndMaybeRest() throws InterruptedException {
     soFarThisSecond++;
-    if (soFarThisSecond >= getRowsPerSecondForSubTask()) {
+    if(sleepPerRow > 0){
+      Thread.sleep(sleepPerRow);
+    }
+    if (sleepPerRow <= 0 && soFarThisSecond >= getRowsPerSecondForSubTask()) {
       rest();
     }
   }
@@ -71,7 +81,7 @@ class FlinkFakerGenerator extends RichFlatMapFunction<Long, RowData> {
     for (int i = 0; i < fieldExpressions.length; i++) {
 
       float fieldNullRate = fieldNullRates[i];
-      if (faker.random().nextFloat() >= fieldNullRate) {
+      if (rand.nextFloat() >= fieldNullRate) {
         List<String> values = new ArrayList<String>();
         for (int j = 0; j < fieldCollectionLengths[i]; j++) {
           for (int k = 0; k < fieldExpressions[i].length; k++) {
@@ -80,6 +90,7 @@ class FlinkFakerGenerator extends RichFlatMapFunction<Long, RowData> {
           }
         }
 
+        // 和LookupFunction中一样，把生成的string类型的数据转换成flink sql内部类型，设置row
         row.setField(
             i, FakerUtils.stringValueToType(values.toArray(new String[values.size()]), types[i]));
       } else {
@@ -90,6 +101,12 @@ class FlinkFakerGenerator extends RichFlatMapFunction<Long, RowData> {
   }
 
   private long getRowsPerSecondForSubTask() {
+    /***
+     * 计算每秒生成的记录数
+     * numSubtasks = getNumberOfParallelSubtasks获取这个subtask总的并行度
+     * indexOfThisSubtask = getIndexOfThisSubtask获取这个subtask的索引
+     * rowsPerSecond / numSubtasks = 单个subtask生成记录数的速率
+     */
     int numSubtasks = getRuntimeContext().getNumberOfParallelSubtasks();
     int indexOfThisSubtask = getRuntimeContext().getIndexOfThisSubtask();
     long baseRowsPerSecondPerSubtask = rowsPerSecond / numSubtasks;
