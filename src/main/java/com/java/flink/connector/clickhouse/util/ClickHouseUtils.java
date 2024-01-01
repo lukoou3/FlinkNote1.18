@@ -188,9 +188,14 @@ public class ClickHouseUtils {
     public static Block getInsertBlockForSql(String[] urls, int urlIndex, Properties connInfo, String sql) throws Exception {
         Class.forName("com.github.housepower.jdbc.ClickHouseDriver");
 
-        Matcher matcher = VALUES_REGEX.matcher(sql);
-        Preconditions.checkArgument(matcher.find(), "insert sql syntax error:%s", sql);
-        String insertQuery = sql.substring(0,  matcher.end() - 1);
+        String insertQuery;
+        if (sql.trim().toLowerCase().endsWith("values")) {
+            insertQuery = sql;
+        } else {
+            Matcher matcher = VALUES_REGEX.matcher(sql);
+            Preconditions.checkArgument(matcher.find(), "insert sql syntax error:%s", sql);
+            insertQuery = sql.substring(0,  matcher.end() - 1);
+        }
         LOG.warn("getInsertBlock insertQuery:{}.", insertQuery);
 
         int retryCount = 0;
