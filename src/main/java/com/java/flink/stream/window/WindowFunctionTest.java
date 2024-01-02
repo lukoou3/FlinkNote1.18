@@ -4,10 +4,13 @@ import com.alibaba.fastjson2.JSON;
 import com.java.flink.stream.func.FieldGeneSouce;
 import com.java.flink.stream.func.LogMap;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.flink.api.common.functions.AggregateFunction;
+import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
+import org.apache.flink.streaming.api.functions.windowing.WindowFunction;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
@@ -71,6 +74,174 @@ public class WindowFunctionTest {
                 .window(TumblingProcessingTimeWindows.of(Time.seconds(5)))
                 .process(processWindowFunction)
                 .print();
+
+        env.execute("WindowFunctionTest");
+    }
+
+    /**
+     * ReduceFunction 指定两条输入数据如何合并起来产生一条输出数据，输入和输出数据的类型必须相同。 Flink 使用 ReduceFunction 对窗口中的数据进行增量聚合。
+     * 输入和输出数据的类型必须相同：决定了这个方法用的较少
+     */
+    @Test
+    public void testReduceFunction() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(2);
+
+        DataStream<String> ds = env.addSource(new FieldGeneSouce("[" + StringUtils.join(fieldGenesDesc, ",") + "]", 1, 1000));
+
+        ds.map(x -> JSON.parseObject(x, OnlineLog.class))
+                .map(new LogMap<>())
+                .keyBy(x -> x.pageId)
+                .window(TumblingProcessingTimeWindows.of(Time.seconds(5)))
+                .reduce((log1, log2) -> {log2.visitCnt += log1.visitCnt;return log2;})
+                .print();
+
+        env.execute("WindowFunctionTest");
+    }
+
+    /**
+     * ReduceFunction 是 AggregateFunction 的特殊情况。
+     * AggregateFunction 接收三个类型：输入数据的类型(IN)、累加器的类型（ACC）和输出数据的类型（OUT）。
+     * 输入数据的类型是输入流的元素类型，AggregateFunction 接口有如下几个方法：创建初始累加器、把每一条元素加进累加器、合并两个累加器、从累加器中提取输出（OUT 类型）。
+     *
+     * 与 ReduceFunction 相同，Flink 会在输入数据到达窗口时直接进行增量聚合。
+     */
+    @Test
+    public void testAggregateFunction() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(2);
+
+        DataStream<String> ds = env.addSource(new FieldGeneSouce("[" + StringUtils.join(fieldGenesDesc, ",") + "]", 1, 1000));
+
+        ds.map(x -> JSON.parseObject(x, OnlineLog.class))
+                .map(new LogMap<>())
+                .keyBy(x -> x.pageId)
+                .window(TumblingProcessingTimeWindows.of(Time.seconds(5)))
+                .aggregate(new AggregateFunction<OnlineLog, OnlineLog, String>() {
+                    @Override
+                    public OnlineLog createAccumulator() {
+                        return new OnlineLog();
+                    }
+
+                    @Override
+                    public OnlineLog add(OnlineLog value, OnlineLog accumulator) {
+                        accumulator.pageId = value.pageId;
+                        accumulator.visitCnt += value.visitCnt;
+                        return accumulator;
+                    }
+
+                    @Override
+                    public String getResult(OnlineLog acc) {
+                        return acc.pageId + ":" + acc.visitCnt;
+                    }
+
+                    @Override
+                    public OnlineLog merge(OnlineLog a, OnlineLog b) {
+                        b.visitCnt += a.visitCnt;
+                        return b;
+                    }
+                }).print();
+
+        env.execute("WindowFunctionTest");
+    }
+
+    /**
+     * AggregateFunction没法获取key和窗口时间，可以和ProcessWindowFunction结合
+     */
+    @Test
+    public void testAggregateFunctionWithProcessWindowFunction() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(2);
+
+        DataStream<String> ds = env.addSource(new FieldGeneSouce("[" + StringUtils.join(fieldGenesDesc, ",") + "]", 1, 1000));
+        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        ds.map(x -> JSON.parseObject(x, OnlineLog.class))
+                .map(new LogMap<>())
+                .keyBy(x -> x.pageId)
+                .window(TumblingProcessingTimeWindows.of(Time.seconds(5)))
+                .aggregate(new AggregateFunction<OnlineLog, OnlineLog, OnlineLog>() {
+                    @Override
+                    public OnlineLog createAccumulator() {
+                        return new OnlineLog();
+                    }
+
+                    @Override
+                    public OnlineLog add(OnlineLog value, OnlineLog accumulator) {
+                        accumulator.pageId = value.pageId;
+                        accumulator.visitCnt += value.visitCnt;
+                        return accumulator;
+                    }
+
+                    @Override
+                    public OnlineLog getResult(OnlineLog acc) {
+                        return acc;
+                    }
+
+                    @Override
+                    public OnlineLog merge(OnlineLog a, OnlineLog b) {
+                        b.visitCnt += a.visitCnt;
+                        return b;
+                    }
+                }, new ProcessWindowFunction<OnlineLog, String, Integer, TimeWindow>() {
+                    @Override
+                    public void process(Integer key, ProcessWindowFunction<OnlineLog, String, Integer, TimeWindow>.Context context, Iterable<OnlineLog> elements, Collector<String> out) throws Exception {
+                        OnlineLog acc = elements.iterator().next();
+                        String windowStart = fmt.format(new Date(context.window().getStart()));
+                        String windowEnd = fmt.format(new Date(context.window().getEnd()));
+                        out.collect(String.format("%s:%d.%s,%s", key, acc.visitCnt, windowStart, windowEnd));
+                    }
+                }).print();
+
+        env.execute("WindowFunctionTest");
+    }
+
+    /**
+     * AggregateFunction没法获取key和窗口时间，可以和WindowFunction结合.和ProcessWindowFunction基本一样。
+     */
+    @Test
+    public void testAggregateFunctionWithWindowFunction() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(2);
+
+        DataStream<String> ds = env.addSource(new FieldGeneSouce("[" + StringUtils.join(fieldGenesDesc, ",") + "]", 1, 1000));
+        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        ds.map(x -> JSON.parseObject(x, OnlineLog.class))
+                .map(new LogMap<>())
+                .keyBy(x -> x.pageId)
+                .window(TumblingProcessingTimeWindows.of(Time.seconds(5)))
+                .aggregate(new AggregateFunction<OnlineLog, OnlineLog, OnlineLog>() {
+                    @Override
+                    public OnlineLog createAccumulator() {
+                        return new OnlineLog();
+                    }
+
+                    @Override
+                    public OnlineLog add(OnlineLog value, OnlineLog accumulator) {
+                        accumulator.pageId = value.pageId;
+                        accumulator.visitCnt += value.visitCnt;
+                        return accumulator;
+                    }
+
+                    @Override
+                    public OnlineLog getResult(OnlineLog acc) {
+                        return acc;
+                    }
+
+                    @Override
+                    public OnlineLog merge(OnlineLog a, OnlineLog b) {
+                        b.visitCnt += a.visitCnt;
+                        return b;
+                    }
+                }, new WindowFunction<OnlineLog, String, Integer, TimeWindow>() {
+
+                    @Override
+                    public void apply(Integer key, TimeWindow window, Iterable<OnlineLog> input, Collector<String> out) throws Exception {
+                        OnlineLog acc = input.iterator().next();
+                        String windowStart = fmt.format(new Date(window.getStart()));
+                        String windowEnd = fmt.format(new Date(window.getEnd()));
+                        out.collect(String.format("%s:%d.%s,%s", key, acc.visitCnt, windowStart, windowEnd));
+                    }
+                }).print();
 
         env.execute("WindowFunctionTest");
     }

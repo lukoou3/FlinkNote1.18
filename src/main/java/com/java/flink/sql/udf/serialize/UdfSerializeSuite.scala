@@ -45,7 +45,6 @@ class UdfSerializeSuite extends AnyFunSuite with BeforeAndAfterAll{
 
     sql = """
     select
-        name,
         udf_ser(name, 'a') name1,
         udf_ser(name, 'b') name2
     from heros
@@ -80,7 +79,6 @@ class UdfSerializeSuite extends AnyFunSuite with BeforeAndAfterAll{
 
     sql = """
     select
-        name,
         udf_ser(name, 'a') name1,
         udf_ser(name, 'b') name2
     from heros
