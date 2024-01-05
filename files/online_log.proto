@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+message OnlineLog {
+  string dt = 1;
+  string bs = 2;
+  string report_time = 3;
+  string browser_uniq_id = 4;
+  string os_plant = 5;
+  string page_id = 6;
+  string page_name = 7;
+  string page_param = 8;
+  optional int64 item_id = 9;
+  optional int32 item_type = 10;
+  string visit_time = 11;
+}
