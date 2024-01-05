@@ -88,6 +88,7 @@ public final class SocketSource
     @Override
     public SplitEnumerator<DummySplit, DummyCheckpoint> createEnumerator(
             SplitEnumeratorContext<DummySplit> enumContext) throws Exception {
+        // socket本身隐式地表示唯一的拆分，并且不使用枚举器。
         // The socket itself implicitly represents the only split and the enumerator is not
         // utilized.
         return null;
@@ -97,6 +98,7 @@ public final class SocketSource
     public SplitEnumerator<DummySplit, DummyCheckpoint> restoreEnumerator(
             SplitEnumeratorContext<DummySplit> enumContext, DummyCheckpoint checkpoint)
             throws Exception {
+        // 此源不具有容错性
         // This source is not fault-tolerant.
         return null;
     }
