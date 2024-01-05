@@ -28,7 +28,7 @@ public class LocalLengthDelimitedFileUseMmapSourceFunctionV2 extends RichParalle
 
     @Override
     public void open(Configuration parameters) throws Exception {
-        contentPosData = SingleValueMap.acquireData("mmap_content_pos_" + filePath, () -> getLinePos(filePath));
+        contentPosData = SingleValueMap.acquireData("mmap_content_pos_" + filePath, () -> getContentPos(filePath));
         contentPos = contentPosData.getData();
         mmap = Files.map(new File(filePath));
     }
@@ -77,19 +77,19 @@ public class LocalLengthDelimitedFileUseMmapSourceFunctionV2 extends RichParalle
         }
     }
 
-    private int[] getLinePos(String filePath) throws Exception{
+    private int[] getContentPos(String filePath) throws Exception{
         MappedByteBuffer byteBuffer = Files.map(new File(filePath));
-        IntArrayList linePos = new IntArrayList(byteBuffer.limit() / (1024 * 16));
+        IntArrayList contentPos = new IntArrayList(byteBuffer.limit() / (1024 * 16));
         int limit = byteBuffer.limit();
         int size;
         int read = 0;
         while (read < limit){
             size = byteBuffer.getInt(read);
             read += size + 4;
-            linePos.add(read);
+            contentPos.add(read);
         }
         assert read == limit;
 
-        return linePos.toIntArray();
+        return contentPos.toIntArray();
     }
 }
