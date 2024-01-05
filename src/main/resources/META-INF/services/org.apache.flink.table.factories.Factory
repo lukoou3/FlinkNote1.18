@@ -1,3 +1,4 @@
 com.java.flink.connector.faker.FlinkFakerTableSourceFactory
 com.java.flink.connector.fileexp.table.FileDynamicTableFactory
 com.java.flink.connector.socketexp.SocketDynamicTableFactory
+com.java.flink.connector.log.LogTableSinkFactory
