@@ -9,7 +9,6 @@ import java.io.File;
 import java.nio.MappedByteBuffer;
 import java.nio.charset.StandardCharsets;
 
-@Deprecated
 public class LocalTextFileUseMmapSourceFunction extends RichParallelSourceFunction<String> {
     private String filePath;
     private long sleep;

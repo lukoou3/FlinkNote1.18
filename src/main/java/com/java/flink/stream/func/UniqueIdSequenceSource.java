@@ -4,7 +4,6 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
 import org.apache.flink.types.LongValue;
 
-@Deprecated
 public class UniqueIdSequenceSource extends RichParallelSourceFunction<LongValue> {
     private volatile boolean stop;
     private int n;

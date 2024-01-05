@@ -5,7 +5,6 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
 import org.apache.flink.types.LongValue;
 
-@Deprecated
 public class IdSequenceSource extends RichParallelSourceFunction<Tuple2<Integer, Long>> {
     private volatile boolean stop;
     private int indexOfSubtask;

@@ -6,7 +6,6 @@ import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunctio
 import java.io.Serializable;
 
 // SourceFunction这个接口废弃了，建议使用Source接口，之后看看怎么实现
-@Deprecated
 public abstract class CustomSourceFunction<T> extends RichParallelSourceFunction<T> {
     private volatile boolean stop;
     protected int indexOfSubtask;

@@ -1,7 +1,6 @@
 package com.java.flink.stream.func;
 
 import com.java.flink.util.SingleValueMap;
-import com.java.flink.util.SingleValueMapTest;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.shaded.guava31.com.google.common.io.Files;
@@ -11,7 +10,7 @@ import java.io.File;
 import java.nio.MappedByteBuffer;
 import java.nio.charset.StandardCharsets;
 
-@Deprecated
+
 public class LocalTextFileUseMmapSourceFunctionV2 extends RichParallelSourceFunction<String> {
     private String filePath;
     private long sleep;

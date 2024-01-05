@@ -9,7 +9,6 @@ import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunctio
 import java.util.HashMap;
 import java.util.List;
 
-@Deprecated
 public class FieldGeneSouce extends RichParallelSourceFunction<String> {
     private volatile boolean stop;
     private int indexOfSubtask;

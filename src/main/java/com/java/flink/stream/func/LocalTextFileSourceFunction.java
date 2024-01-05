@@ -7,7 +7,6 @@ import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunctio
 
 import java.io.FileInputStream;
 
-@Deprecated
 public class LocalTextFileSourceFunction extends RichParallelSourceFunction<String> {
     private String filePath;
     private long sleep;
