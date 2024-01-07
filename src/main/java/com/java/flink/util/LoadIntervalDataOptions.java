@@ -1,6 +1,8 @@
 package com.java.flink.util;
 
-public class LoadIntervalDataOptions {
+import java.io.Serializable;
+
+public class LoadIntervalDataOptions implements Serializable {
     private static final int DEFAULT_INTERVAL_MILLIS = 1000 * 60 * 10;
     public static final int DEFAULT_MAX_RETRY_TIMES = 3;
     public static final int DEFAULT_RETRY_WAIT_MILLIS = 1000;
@@ -11,7 +13,7 @@ public class LoadIntervalDataOptions {
     private final long retryWaitMs;
     private final boolean failOnException;
 
-    public LoadIntervalDataOptions(long intervalMs, int maxRetries, long retryWaitMs, boolean failOnException) {
+    protected LoadIntervalDataOptions(long intervalMs, int maxRetries, long retryWaitMs, boolean failOnException) {
         this.intervalMs = intervalMs;
         this.maxRetries = maxRetries;
         this.retryWaitMs = retryWaitMs;

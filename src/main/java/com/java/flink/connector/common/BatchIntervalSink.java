@@ -45,26 +45,26 @@ public abstract class BatchIntervalSink<T> extends RichSinkFunction<T> implement
         this.keyedMode = keyedMode;
     }
 
-    abstract void onInit(Configuration parameters) throws Exception;
+    protected abstract void onInit(Configuration parameters) throws Exception;
 
-    abstract void onFlush(Collection<T> datas) throws Exception;
+    protected abstract void onFlush(Collection<T> datas) throws Exception;
 
-    abstract void onClose() throws Exception;
+    protected abstract void onClose() throws Exception;
 
-    T valueTransform(T data){
+    protected T valueTransform(T data){
         return data;
     }
 
-    Object getKey(T data){
+    protected Object getKey(T data){
         throw new RuntimeException("keyedMode必须实现");
     }
 
-    T replaceValue(T newValue, T oldValue){
+    protected T replaceValue(T newValue, T oldValue){
         return newValue;
     }
 
     @Override
-    public void open(Configuration parameters) throws Exception {
+    public final void open(Configuration parameters) throws Exception {
         onInit(parameters);
         numBytesOutCounter = getRuntimeContext().getMetricGroup().getIOMetricGroup().getNumBytesOutCounter();
         numRecordsOutCounter = getRuntimeContext().getMetricGroup().getIOMetricGroup().getNumRecordsOutCounter();
@@ -183,7 +183,7 @@ public abstract class BatchIntervalSink<T> extends RichSinkFunction<T> implement
     }
 
     @Override
-    public void close() throws Exception {
+    public final void close() throws Exception {
         if (!closed) {
             closed = true;
 
