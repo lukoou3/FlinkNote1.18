@@ -1,6 +1,9 @@
 package com.java.flink.connector.jdbc;
 
 import com.java.flink.util.JavaReflection;
+import com.java.flink.util.function.SerializableBiFunction;
+import com.java.flink.util.function.SerializableFunction;
+import com.java.flink.util.function.SerializablePredicate;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Preconditions;
 
@@ -9,9 +12,6 @@ import java.beans.PropertyDescriptor;
 import java.lang.reflect.Method;
 import java.sql.PreparedStatement;
 import java.util.*;
-import java.util.function.BiFunction;
-import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class PojoBatchIntervalJdbcSink<T> extends BatchIntervalJdbcSink<T> {
@@ -23,16 +23,16 @@ public class PojoBatchIntervalJdbcSink<T> extends BatchIntervalJdbcSink<T> {
     private final String[] delFieldNames;
     private final String delSql;
     private transient Method[] delFieldReadMethods;
-    private final Function<T, Object> keyExtractor;
-    private final Predicate<T> deleteDaTaPredicate;
-    private final BiFunction<T, T, T> replaceDaTaValue;
-
+    private final SerializableFunction<T, Object> keyExtractor;
+    private final SerializablePredicate<T> deleteDaTaPredicate;
+    private final SerializableBiFunction<T, T, T> replaceDaTaValue;
 
     public PojoBatchIntervalJdbcSink(JdbcConnectionOptions connectionOptions, JdbcExecutionOptions executionOptions, JdbcPojoOptions<T> pojoOptions) {
         super(connectionOptions, executionOptions,
                 pojoOptions.keyedMode, pojoOptions.periodExecSqlStrategy, pojoOptions.hasDelete);
         this.clazz = pojoOptions.clazz;
         this.fieldNames = getFieldNames();
+        Preconditions.checkArgument(fieldNames.length > 0);
         String[] cols = Arrays.stream(this.fieldNames).map(name -> pojoOptions.fieldColMap.getOrDefault(name, name)).toArray(String[]::new);
         this.updateSql = geneJdbcPreparedUpdateSql(pojoOptions.tableName, cols, pojoOptions.oldValCols, pojoOptions.updateMode);
         if(pojoOptions.hasDelete){
@@ -54,7 +54,9 @@ public class PojoBatchIntervalJdbcSink<T> extends BatchIntervalJdbcSink<T> {
         super.onInit(parameters);
         Map<String, PropertyDescriptor> propertyDescriptorMap = Arrays.stream(JavaReflection.getJavaBeanReadableAndWritableProperties(clazz)).collect(Collectors.toMap(f -> f.getName(), f -> f));
         this.readMethods = getFieldReadMethods(propertyDescriptorMap, fieldNames);
-        this.delFieldReadMethods = getFieldReadMethods(propertyDescriptorMap, delFieldNames);
+        if(hasDelete){
+            this.delFieldReadMethods = getFieldReadMethods(propertyDescriptorMap, delFieldNames);
+        }
     }
 
     private Method[] getFieldReadMethods(Map<String, PropertyDescriptor> propertyDescriptorMap, String[] fieldNames) {

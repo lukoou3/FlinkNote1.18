@@ -1,5 +1,8 @@
 package com.java.flink.connector.jdbc;
 
+import com.java.flink.util.function.SerializableBiFunction;
+import com.java.flink.util.function.SerializableFunction;
+import com.java.flink.util.function.SerializablePredicate;
 import org.apache.flink.util.Preconditions;
 
 import java.io.Serializable;
@@ -18,13 +21,13 @@ public class JdbcPojoOptions<T> implements Serializable {
     final Map<String, String> fieldColMap;
     final PeriodExecSqlStrategy periodExecSqlStrategy;
     final boolean keyedMode;
-    final Function<T, Object> keyExtractor;
+    final SerializableFunction<T, Object> keyExtractor;
     final boolean hasDelete;
     final List<String> deleteKeyFields;
-    final Predicate<T> deleteDaTaPredicate;
-    final BiFunction<T, T, T> replaceDaTaValue;
+    final SerializablePredicate<T> deleteDaTaPredicate;
+    final SerializableBiFunction<T, T, T> replaceDaTaValue;
 
-    private JdbcPojoOptions(Class<T> clazz, String tableName, boolean updateMode, List<String> oldValCols, Map<String, String> fieldColMap, PeriodExecSqlStrategy periodExecSqlStrategy, boolean keyedMode, Function<T, Object> keyExtractor, boolean hasDelete, List<String> deleteKeyFields, Predicate<T> deleteDaTaPredicate, BiFunction<T, T, T> replaceDaTaValue) {
+    private JdbcPojoOptions(Class<T> clazz, String tableName, boolean updateMode, List<String> oldValCols, Map<String, String> fieldColMap, PeriodExecSqlStrategy periodExecSqlStrategy, boolean keyedMode, SerializableFunction<T, Object> keyExtractor, boolean hasDelete, List<String> deleteKeyFields, SerializablePredicate<T> deleteDaTaPredicate, SerializableBiFunction<T, T, T> replaceDaTaValue) {
         this.clazz = clazz;
         this.tableName = tableName;
         this.updateMode = updateMode;
@@ -52,73 +55,73 @@ public class JdbcPojoOptions<T> implements Serializable {
         private PeriodExecSqlStrategy periodExecSqlStrategy = null;
         private boolean keyedMode = false;
         // keyedMode参数
-        private Function<T, Object> keyExtractor = null;
+        private SerializableFunction<T, Object> keyExtractor = null;
         private boolean hasDelete = false;
         private List<String> deleteKeyFields = Collections.emptyList();
-        private Predicate<T> deleteDaTaPredicate = null;
-        private BiFunction<T, T, T> replaceDaTaValue = null;
+        private SerializablePredicate<T> deleteDaTaPredicate = null;
+        private SerializableBiFunction<T, T, T> replaceDaTaValue = null;
 
-        public Builder withClass(Class<T> clazz) {
+        public Builder<T> withClass(Class<T> clazz) {
             this.clazz = clazz;
             return this;
         }
 
-        public Builder withTableName(String tableName) {
+        public Builder<T> withTableName(String tableName) {
             this.tableName = tableName;
             return this;
         }
 
-        public Builder withUpdateMode(boolean updateMode) {
+        public Builder<T> withUpdateMode(boolean updateMode) {
             this.updateMode = updateMode;
             return this;
         }
 
-        public Builder withOldValCols(List<String> oldValCols) {
+        public Builder<T> withOldValCols(List<String> oldValCols) {
             this.oldValCols = oldValCols;
             return this;
         }
 
-        public Builder withFieldColMap(Map<String, String> fieldColMap) {
+        public Builder<T> withFieldColMap(Map<String, String> fieldColMap) {
             this.fieldColMap = fieldColMap;
             return this;
         }
 
-        public Builder withPeriodExecSqlStrategy(PeriodExecSqlStrategy periodExecSqlStrategy) {
+        public Builder<T> withPeriodExecSqlStrategy(PeriodExecSqlStrategy periodExecSqlStrategy) {
             this.periodExecSqlStrategy = periodExecSqlStrategy;
             return this;
         }
 
-        public Builder withKeyedMode(boolean keyedMode) {
+        public Builder<T> withKeyedMode(boolean keyedMode) {
             this.keyedMode = keyedMode;
             return this;
         }
 
-        public Builder withKeyExtractor(Function<T, Object> keyExtractor) {
+        public Builder<T> withKeyExtractor(SerializableFunction<T, Object> keyExtractor) {
             this.keyExtractor = keyExtractor;
             return this;
         }
 
-        public Builder withHasDelete(boolean hasDelete) {
+        public Builder<T> withHasDelete(boolean hasDelete) {
             this.hasDelete = hasDelete;
             return this;
         }
 
-        public Builder withDeleteKeyFields(List<String> deleteKeyFields) {
+        public Builder<T> withDeleteKeyFields(List<String> deleteKeyFields) {
             this.deleteKeyFields = deleteKeyFields;
             return this;
         }
 
-        public Builder withDeleteDaTaPredicate(Predicate<T> deleteDaTaPredicate) {
+        public Builder<T> withDeleteDaTaPredicate(SerializablePredicate<T> deleteDaTaPredicate) {
             this.deleteDaTaPredicate = deleteDaTaPredicate;
             return this;
         }
 
-        public Builder withReplaceDaTaValue(BiFunction<T, T, T> replaceDaTaValue) {
+        public Builder<T> withReplaceDaTaValue(SerializableBiFunction<T, T, T> replaceDaTaValue) {
             this.replaceDaTaValue = replaceDaTaValue;
             return this;
         }
 
-        public JdbcPojoOptions build() {
+        public JdbcPojoOptions<T> build() {
             Preconditions.checkNotNull(clazz);
             Preconditions.checkNotNull(tableName);
             if(keyedMode){
@@ -129,7 +132,7 @@ public class JdbcPojoOptions<T> implements Serializable {
                 Preconditions.checkArgument(!deleteKeyFields.isEmpty());
                 Preconditions.checkNotNull(deleteDaTaPredicate);
             }
-            return new JdbcPojoOptions(clazz, tableName, updateMode, oldValCols, fieldColMap, periodExecSqlStrategy, keyedMode, keyExtractor, hasDelete, deleteKeyFields, deleteDaTaPredicate, replaceDaTaValue);
+            return new JdbcPojoOptions<T>(clazz, tableName, updateMode, oldValCols, fieldColMap, periodExecSqlStrategy, keyedMode, keyExtractor, hasDelete, deleteKeyFields, deleteDaTaPredicate, replaceDaTaValue);
         }
     }
 }

@@ -20,7 +20,7 @@ public abstract class BatchIntervalJdbcSink<T> extends BatchIntervalSink<T> {
     private final JdbcConnectionOptions connectionOptions;
     private final int maxRetries;
     private final PeriodExecSqlStrategy periodExecSqlStrategy;
-    private final boolean hasDelete;
+    protected final boolean hasDelete;
     private transient Connection conn;
     private transient PreparedStatement stmt;
     private transient PreparedStatement deleteStmt;
