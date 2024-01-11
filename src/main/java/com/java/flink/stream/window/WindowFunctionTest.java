@@ -24,6 +24,7 @@ import java.util.Date;
  * https://nightlies.apache.org/flink/flink-docs-release-1.16/zh/docs/dev/datastream/operators/windows/#%E7%AA%97%E5%8F%A3%E5%87%BD%E6%95%B0window-functions
  * https://nightlies.apache.org/flink/flink-docs-release-1.16/docs/dev/datastream/operators/windows/#window-functions
  * https://nightlies.apache.org/flink/flink-docs-release-1.18/docs/dev/datastream/operators/windows/#tumbling-windows
+ * https://nightlies.apache.org/flink/flink-docs-release-1.18/zh/docs/dev/datastream/operators/windows/#window-assigners
  *
  * 定义了 window assigner 之后，我们需要指定当窗口触发之后，我们如何计算每个窗口中的数据， 这就是 window function 的职责了。关于窗口如何触发，详见 triggers。
  *
@@ -197,6 +198,9 @@ public class WindowFunctionTest {
 
     /**
      * AggregateFunction没法获取key和窗口时间，可以和WindowFunction结合.和ProcessWindowFunction基本一样。
+     *     在某些可以使用 ProcessWindowFunction 的地方，可以使用 WindowFunction。
+     *     它是旧版的 ProcessWindowFunction，只能提供更少的环境信息且缺少一些高级的功能，比如 per-window state。
+     *     这个接口会在未来被弃用。
      */
     @Test
     public void testAggregateFunctionWithWindowFunction() throws Exception {
