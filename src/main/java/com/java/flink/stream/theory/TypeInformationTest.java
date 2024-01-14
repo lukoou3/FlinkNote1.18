@@ -1,19 +1,31 @@
 package com.java.flink.stream.theory;
 
+import com.java.flink.stream.func.LogMap;
 import org.apache.flink.api.common.ExecutionConfig;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.base.StringSerializer;
 import org.apache.flink.api.java.typeutils.PojoTypeInfo;
+import org.apache.flink.api.java.typeutils.TypeExtractor;
 import org.apache.flink.api.java.typeutils.runtime.PojoSerializer;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.connector.datagen.source.DataGeneratorSource;
+import org.apache.flink.connector.datagen.source.GeneratorFunction;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.types.Row;
 import org.junit.Test;
 
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.util.Map;
+
+import static org.apache.flink.configuration.HeartbeatManagerOptions.HEARTBEAT_TIMEOUT;
 
 public class TypeInformationTest {
 
@@ -78,13 +90,96 @@ public class TypeInformationTest {
         data.setId(2);
         data.setName("燕青丝");
         dataOutput.setPosition(0);
-        ((PojoSerializer<PojoData>)serializer).serialize(data, dataOutput);
+        ((PojoSerializer<PojoData>) serializer).serialize(data, dataOutput);
         readBuffer = dataOutput.wrapAsByteBuffer();
 
         dataInput = new DataInputDeserializer(readBuffer.duplicate());
-        data2 = ((PojoSerializer<PojoData>)serializer).deserialize(dataInput);
+        data2 = ((PojoSerializer<PojoData>) serializer).deserialize(dataInput);
         System.out.println(data2);
     }
+
+    /**
+     * org.apache.flink.api.java.typeutils.TypeExtractor#analyzePojo // 判断是否是pojo
+     *     org.apache.flink.api.java.typeutils.TypeExtractor#getAllDeclaredFields // 获取全部属性
+     *     org.apache.flink.api.java.typeutils.TypeExtractor#isValidPojoField // 判断属性是否是pojo属性，public或者有get set方法
+     *
+     */
+    @Test
+    public void isPojoTypeTest() throws Exception {
+        TypeInformation<PojoData> typeInformation = TypeInformation.of(PojoData.class);
+        System.out.println(typeInformation.getClass());
+        System.out.println(typeInformation.createSerializer(new ExecutionConfig()).getClass());
+        System.out.println();
+
+        // 属性全部定义public也被推断为PojoTypeInfo
+        TypeInformation<ImplicitPojoData> typeInformation1 = TypeInformation.of(ImplicitPojoData.class);
+        System.out.println(typeInformation1.getClass());
+        System.out.println(typeInformation1.createSerializer(new ExecutionConfig()).getClass());
+        System.out.println();
+
+        TypeInformation<NoPojoData> typeInformation2 = TypeInformation.of(NoPojoData.class);
+        System.out.println(typeInformation2.getClass());
+        System.out.println(typeInformation2.createSerializer(new ExecutionConfig()).getClass());
+        System.out.println();
+
+        // 虽然NoPojoData2是PojoTypeInfo，但它的datas属性是GenericType
+        TypeInformation<NoPojoData2> typeInformation3 = TypeInformation.of(NoPojoData2.class);
+        System.out.println(typeInformation3.getClass());
+        System.out.println(typeInformation3.createSerializer(new ExecutionConfig()).getClass());
+        System.out.println();
+    }
+
+    @Test
+    public void rowTest() throws Exception {
+        Configuration conf = new Configuration();
+        conf.setString("rest.bind-port", "8081-8085");
+        conf.setString(HEARTBEAT_TIMEOUT.key(), "300000");
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment(conf);
+        env.setParallelism(1);
+
+        DataStream<Row> dataStream = env.fromElements(
+                Row.of("Alice", 12),
+                Row.of("Bob", 10),
+                Row.of("Alice", 100));
+
+        System.out.println(dataStream.getType());
+        System.out.println(TypeExtractor.getForObject(Row.of("Alice", 12)));
+        System.out.println(TypeExtractor.getForObject(Row.of("Alice", 12.2)));
+
+
+        dataStream.map(new LogMap<>())
+                .print();
+
+        env.execute();
+    }
+
+    @Test
+    public void rowTest2() throws Exception {
+        Configuration conf = new Configuration();
+        conf.setString("rest.bind-port", "8081-8085");
+        conf.setString(HEARTBEAT_TIMEOUT.key(), "300000");
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment(conf);
+        env.setParallelism(1);
+
+        DataStream<Row> dataStream = env.fromSource(new DataGeneratorSource<Row>(new GeneratorFunction<Long, Row>() {
+                    @Override
+                    public Row map(Long value) throws Exception {
+                        return Row.of("Alice", 12);
+                    }
+                }, 10, Types.ROW(Types.STRING, Types.INT)),
+                WatermarkStrategy.noWatermarks(), "source");
+
+        System.out.println(dataStream.getType());
+        System.out.println(TypeExtractor.getForObject(Row.of("Alice", 12)));
+        System.out.println(TypeExtractor.getForObject(Row.of("Alice", 12.2)));
+
+
+        dataStream.map(new LogMap<>()).disableChaining()
+                .print();
+
+        env.execute();
+    }
+
 
     public static class PojoData implements Serializable {
         private long id;
@@ -122,6 +217,46 @@ public class TypeInformationTest {
                     "id=" + id +
                     ", name='" + name + '\'' +
                     '}';
+        }
+    }
+
+    public static class ImplicitPojoData implements Serializable {
+        public long id;
+        public String name;
+    }
+
+    public static class NoPojoData implements Serializable {
+        private long id;
+        private String name;
+    }
+
+    public static class NoPojoData2 implements Serializable {
+        private long id;
+        private String name;
+        public Map<String, Object> datas;
+
+        public long getId() {
+            return id;
+        }
+
+        public void setId(long id) {
+            this.id = id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public Map<String, Object> getDatas() {
+            return datas;
+        }
+
+        public void setDatas(Map<String, Object> datas) {
+            this.datas = datas;
         }
     }
 }
