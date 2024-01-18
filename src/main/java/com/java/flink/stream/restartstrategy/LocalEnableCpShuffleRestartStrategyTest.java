@@ -20,10 +20,12 @@ import static org.apache.flink.configuration.HeartbeatManagerOptions.HEARTBEAT_T
  * local、集群、yarn提交都是这样。这里只是使用local模式便与调试
  * https://nightlies.apache.org/flink/flink-docs-release-1.18/docs/ops/state/task_failure_recovery/
  * https://nightlies.apache.org/flink/flink-docs-release-1.16/docs/ops/state/task_failure_recovery/
+ *
+ * keyBy后一个task失败，全部重启，应该是依赖上游全部的任务吧
  */
-public class LocalEnableCpRestartStrategyTest {
+public class LocalEnableCpShuffleRestartStrategyTest {
     static AtomicInteger retry = new AtomicInteger();
-    static final Logger LOG = LoggerFactory.getLogger(LocalEnableCpRestartStrategyTest.class);
+    static final Logger LOG = LoggerFactory.getLogger(LocalEnableCpShuffleRestartStrategyTest.class);
     static String[] fieldGenesDesc = new String[]{
             "{\"type\":\"int_random\", \"fields\":{\"name\":\"pageId\", \"start\":1, \"end\":3}}",
             "{\"type\":\"int_random\", \"fields\":{\"name\":\"userId\", \"start\":1, \"end\":5}}",
@@ -44,7 +46,7 @@ public class LocalEnableCpRestartStrategyTest {
 
         DataStream<String> ds = env.addSource(new FieldGeneSouce("[" + StringUtils.join(fieldGenesDesc, ",") + "]", 1, 1000));
 
-        ds.map(new RichMapFunction<String, String>() {
+        ds.keyBy(x -> x.hashCode()).map(new RichMapFunction<String, String>() {
             @Override
             public void open(Configuration parameters) throws Exception {
                 LOG.warn("open");

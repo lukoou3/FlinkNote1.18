@@ -41,10 +41,11 @@ import static org.apache.flink.configuration.HeartbeatManagerOptions.HEARTBEAT_T
  * org.apache.flink.runtime.taskmanager.Task#run
  * org.apache.flink.runtime.taskmanager.Task#restoreAndInvoke(invokable) //invokable是反序列化的SourceStreamTask(StreamTask)
  * org.apache.flink.streaming.runtime.tasks.StreamTask#invoke
+ *
  */
-public class LocalRestartStrategyTest {
+public class LocalShuffleRestartStrategyTest {
     static AtomicInteger retry = new AtomicInteger();
-    static final Logger LOG = LoggerFactory.getLogger(LocalRestartStrategyTest.class);
+    static final Logger LOG = LoggerFactory.getLogger(LocalShuffleRestartStrategyTest.class);
     static String[] fieldGenesDesc = new String[]{
             "{\"type\":\"int_random\", \"fields\":{\"name\":\"pageId\", \"start\":1, \"end\":3}}",
             "{\"type\":\"int_random\", \"fields\":{\"name\":\"userId\", \"start\":1, \"end\":5}}",
@@ -59,7 +60,7 @@ public class LocalRestartStrategyTest {
      * https://nightlies.apache.org/flink/flink-docs-release-1.16/docs/ops/state/task_failure_recovery/
      * restart-strategy变成restart-strategy.type了
      *
-     * 默认就重启失败的那个subtask，任务之间没有依赖，感觉类似spark的宽窄依赖
+     * keyBy后一个task失败，全部重启，应该是依赖上游全部的任务吧，感觉类似spark的宽窄依赖
      */
     public static void main(String[] args) throws Exception {
         Configuration conf = new Configuration();
@@ -76,7 +77,7 @@ public class LocalRestartStrategyTest {
 
         DataStream<String> ds = env.addSource(new FieldGeneSouce("[" + StringUtils.join(fieldGenesDesc, ",") + "]", 1, 1000));
 
-        ds.map(new RichMapFunction<String, String>() {
+        ds.keyBy(x -> x.hashCode()).map(new RichMapFunction<String, String>() {
             @Override
             public void open(Configuration parameters) throws Exception {
                 LOG.warn("open");
