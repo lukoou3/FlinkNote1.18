@@ -1,6 +1,7 @@
 package com.java.flink.connector.test;
 
 import com.alibaba.fastjson2.JSON;
+import com.clickhouse.client.data.ClickHouseBitmap;
 import com.java.flink.connector.clickhouse.sink.MapBatchIntervalClickHouseSink;
 import com.java.flink.stream.func.FieldGeneSouce;
 import org.apache.flink.api.common.functions.MapFunction;
@@ -9,8 +10,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.junit.Test;
 
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
 /**
 CREATE TABLE IF NOT EXISTS test.test_ck_sink_local (
@@ -120,4 +120,95 @@ public class MapBatchIntervalClickHouseSinkTest {
         env.execute("MapBatchIntervalClickHouseSinkTest");
     }
 
+    @Test
+    public void testError() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
+        env.getConfig().enableObjectReuse();
+
+        ClickHouseBitmap bitmap = ClickHouseBitmap.wrap(1, 2, 3, 4, 5);
+        List<Map<String, Object>> datas = new ArrayList<>();
+        Map<String, Object> data = new HashMap<>();
+        data.put("datetime", 1614566501);
+        data.put("1614566500", "a");
+        data.put("value", bitmap.toBytes());
+        datas.add(data);
+        data = new HashMap<>();
+        data.put("datetime", 1614566501);
+        data.put("1614566500", "a");
+        data.put("value", bitmap.toBytes());
+        datas.add(data);
+        DataStream<Map<String, Object>> rstDs =env.fromCollection(datas);
+
+        Properties info = new Properties();
+        info.put("user", "default");
+        info.put("password", "123456");
+        MapBatchIntervalClickHouseSink clickHouseSink = new MapBatchIntervalClickHouseSink(10, 30 * 1000,
+                "192.168.216.86:9001", "test.test_bitmap", info);
+        rstDs.addSink(clickHouseSink);
+
+        env.execute("MapBatchIntervalClickHouseSinkTest");
+    }
+
+    @Test
+    public void testBitmap() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
+        env.getConfig().enableObjectReuse();
+
+        ClickHouseBitmap bitmap1 = ClickHouseBitmap.wrap(1, 2, 3, 4, 5);
+        ClickHouseBitmap bitmap2 = ClickHouseBitmap.wrap(4, 5, 8, 9, 10);
+        List<Map<String, Object>> datas = new ArrayList<>();
+        Map<String, Object> data = new HashMap<>();
+        data.put("datetime", 1614566501);
+        data.put("name", "a");
+        data.put("roaring_str", bitmap1.toBytes());
+        datas.add(data);
+        data = new HashMap<>();
+        data.put("datetime", 1614566501);
+        data.put("name", "b");
+        data.put("roaring_str", bitmap2.toBytes());
+        datas.add(data);
+        DataStream<Map<String, Object>> rstDs =env.fromCollection(datas);
+
+        Properties info = new Properties();
+        info.put("user", "default");
+        info.put("password", "123456");
+        MapBatchIntervalClickHouseSink clickHouseSink = new MapBatchIntervalClickHouseSink(10, 30 * 1000,
+                "192.168.216.86:9001", "test.test_bitmap2", info);
+        rstDs.addSink(clickHouseSink);
+
+        env.execute("MapBatchIntervalClickHouseSinkTest");
+    }
+
+    @Test
+    public void testBitmap2() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
+        env.getConfig().enableObjectReuse();
+
+        Random random = new Random();
+
+        List<Map<String, Object>> datas = new ArrayList<>();
+        int ts = 1614566501 + 86400 + 86400;
+        for (int i = 0; i < 80000; i++) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("datetime", ts);
+            data.put("name", "" + i % 5);
+            ClickHouseBitmap bitmap = ClickHouseBitmap.wrap(random.nextInt(400), random.nextInt(400), random.nextInt(400), random.nextInt(400), 5);
+            data.put("roaring_str", bitmap.toBytes());
+            datas.add(data);
+        }
+
+        DataStream<Map<String, Object>> rstDs =env.fromCollection(datas);
+
+        Properties info = new Properties();
+        info.put("user", "default");
+        info.put("password", "123456");
+        MapBatchIntervalClickHouseSink clickHouseSink = new MapBatchIntervalClickHouseSink(100000, 30 * 1000,
+                "192.168.216.86:9001", "test.test_bitmap2", info);
+        rstDs.addSink(clickHouseSink);
+
+        env.execute("MapBatchIntervalClickHouseSinkTest");
+    }
 }

@@ -112,10 +112,10 @@ public class ClickHouseUtils {
                     if ("LowCardinality(String)".equals(typeStr)) {
                         typeStr = "String";
                     }
-                    IDataType<?, ?> type = DataTypeFactory.get(typeStr, connection.serverContext());
                     if ("MATERIALIZED".equals(defaultTypeStr)) {
                         continue;
                     }
+                    IDataType<?, ?> type = DataTypeFactory.get(typeStr, connection.serverContext());
                     Object defaultValue = parseDefaultValue(type, defaultExpression); // 只解析数字和字符串
                     if (defaultValue == null && !type.nullable()) {
                         if (type instanceof DataTypeArray) {
