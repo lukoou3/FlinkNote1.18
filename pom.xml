@@ -220,6 +220,12 @@
         </dependency>
 
         <dependency>
+            <groupId>com.datadoghq</groupId>
+            <artifactId>sketches-java</artifactId>
+            <version>0.8.2</version>
+        </dependency>
+
+        <dependency>
             <groupId>net.datafaker</groupId>
             <artifactId>datafaker</artifactId>
             <version>1.9.0</version>
