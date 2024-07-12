@@ -35,7 +35,8 @@ import static com.github.housepower.jdbc.ClickhouseJdbcUrlParser.PORT_DELIMITER;
 
 public class ClickHouseBatchInsertConnection implements SQLConnection {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ClickHouseBatchInsertConnection.class);
+    private static final Logger LOG =
+            LoggerFactory.getLogger(ClickHouseBatchInsertConnection.class);
     private static final Pattern VALUES_REGEX = Pattern.compile("[Vv][Aa][Ll][Uu][Ee][Ss]\\s*\\(");
 
     private final AtomicBoolean isClosed;
@@ -128,14 +129,17 @@ public class ClickHouseBatchInsertConnection implements SQLConnection {
 
     @Override
     public Statement createStatement() throws SQLException {
-        Validate.isTrue(!isClosed(), "Unable to create Statement, because the connection is closed.");
+        Validate.isTrue(
+                !isClosed(), "Unable to create Statement, because the connection is closed.");
         throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public ClickHousePreparedBatchInsertStatement prepareStatement(String query)
             throws SQLException {
-        Validate.isTrue( !isClosed(), "Unable to create PreparedStatement, because the connection is closed.");
+        Validate.isTrue(
+                !isClosed(),
+                "Unable to create PreparedStatement, because the connection is closed.");
         Matcher matcher = VALUES_REGEX.matcher(query);
         if (matcher.find()) {
             return new ClickHousePreparedBatchInsertStatement(
@@ -339,10 +343,14 @@ public class ClickHouseBatchInsertConnection implements SQLConnection {
             throw lastException;
         }
 
-        return new NativeContext( clientContext(nativeClient, configure), serverContext(nativeClient, configure), nativeClient);
+        return new NativeContext(
+                clientContext(nativeClient, configure),
+                serverContext(nativeClient, configure),
+                nativeClient);
     }
 
-    private static NativeContext.ClientContext clientContext(NativeClient nativeClient, ClickHouseConfig configure) throws SQLException {
+    private static NativeContext.ClientContext clientContext(
+            NativeClient nativeClient, ClickHouseConfig configure) throws SQLException {
         Validate.isTrue(nativeClient.address() instanceof InetSocketAddress);
         InetSocketAddress address = (InetSocketAddress) nativeClient.address();
         String clientName = configure.clientName();
@@ -380,19 +388,22 @@ public class ClickHouseBatchInsertConnection implements SQLConnection {
         return url.startsWith(ClickhouseJdbcUrlParser.JDBC_CLICKHOUSE_PREFIX);
     }
 
-    public static ClickHouseBatchInsertConnection connect(String url, Properties properties) throws SQLException {
+    public static ClickHouseBatchInsertConnection connect(String url, Properties properties)
+            throws SQLException {
         if (!acceptsURL(url)) {
             return null;
         }
 
-        ClickHouseConfig cfg = ClickHouseConfig.Builder.builder()
+        ClickHouseConfig cfg =
+                ClickHouseConfig.Builder.builder()
                         .withJdbcUrl(url)
                         .withProperties(properties)
                         .build();
         return connect(url, cfg);
     }
 
-    static ClickHouseBatchInsertConnection connect(String url, ClickHouseConfig cfg) throws SQLException {
+    static ClickHouseBatchInsertConnection connect(String url, ClickHouseConfig cfg)
+            throws SQLException {
         if (!acceptsURL(url)) {
             return null;
         }
