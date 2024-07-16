@@ -26,6 +26,7 @@ import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
@@ -75,6 +76,7 @@ public abstract class AbstractBatchIntervalClickHouseSink<T> extends RichSinkFun
     private int urlIndex;
     private final Properties connInfo;
     private final String table;
+    private final String[] insertColumns;
     private String insertSql;
     protected ZoneId tz;
     protected String[] columnNames;
@@ -85,12 +87,17 @@ public abstract class AbstractBatchIntervalClickHouseSink<T> extends RichSinkFun
     protected final SizeHelper writeSizeHelper;
 
     public AbstractBatchIntervalClickHouseSink(int batchSize, int batchByteSize, long batchIntervalMs, String host, String table, Properties connInfo) {
+        this(batchSize, batchByteSize, batchIntervalMs, host, table, null, connInfo);
+    }
+
+    public AbstractBatchIntervalClickHouseSink(int batchSize, int batchByteSize, long batchIntervalMs, String host, String table, @Nullable String[] insertColumns, Properties connInfo) {
         this.batchSize = batchSize;
         this.batchByteSize = batchByteSize;
         this.batchIntervalMs = batchIntervalMs;
         this.writeSizeHelper = new SizeHelper();
         this.urls = ClickHouseUtils.buildUrlsFromHost(host);
         this.table = table;
+        this.insertColumns = insertColumns;
         this.connInfo = connInfo;
         if(!this.connInfo.containsKey(SettingKey.connect_timeout.name())){
             this.connInfo.setProperty(SettingKey.connect_timeout.name(), "30");
@@ -152,7 +159,7 @@ public abstract class AbstractBatchIntervalClickHouseSink<T> extends RichSinkFun
         urlIndex = getRuntimeContext().getIndexOfThisSubtask() % urls.length;
 
         // 获取要插入的列信息
-        Tuple3<String[], Object[], int[]> columnsAndDefaultValuesAndDefaultSizes = ClickHouseUtils.getInsertColumnsAndDefaultValuesAndDefaultSizesForTable( urls, urlIndex, connInfo, table);
+        Tuple3<String[], Object[], int[]> columnsAndDefaultValuesAndDefaultSizes = ClickHouseUtils.getInsertColumnsAndDefaultValuesAndDefaultSizesForTable(urls, urlIndex, connInfo, table, insertColumns);
         columnNames = columnsAndDefaultValuesAndDefaultSizes.f0;
         columnDefaultValues = columnsAndDefaultValuesAndDefaultSizes.f1;
         columnDefaultSizes = columnsAndDefaultValuesAndDefaultSizes.f2;
@@ -212,10 +219,10 @@ public abstract class AbstractBatchIntervalClickHouseSink<T> extends RichSinkFun
         if (flushException != null) throw flushException;
     }
 
-    void onInit(Configuration parameters) throws Exception {}
-    void onClose() throws Exception {}
+    protected void onInit(Configuration parameters) throws Exception {}
+    protected void onClose() throws Exception {}
 
-    abstract int addBatch(Block batch, T data) throws Exception;
+    protected abstract int addBatch(Block batch, T data) throws Exception;
 
     @Override
     public final void invoke(T value, Context context) throws Exception {

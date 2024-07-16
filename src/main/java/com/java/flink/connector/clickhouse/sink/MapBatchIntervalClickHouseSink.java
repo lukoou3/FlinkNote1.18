@@ -14,7 +14,7 @@ public class MapBatchIntervalClickHouseSink extends AbstractBatchIntervalClickHo
     }
 
     @Override
-    int addBatch(Block batch, Map<String, Object> map) throws Exception {
+    protected int addBatch(Block batch, Map<String, Object> map) throws Exception {
         int writeSize = 0;
         Object value;
         for (int i = 0; i < columnNames.length; i++) {

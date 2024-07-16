@@ -12,10 +12,12 @@ import com.github.housepower.misc.BytesCharSeq;
 import com.github.housepower.misc.DateTimeUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -85,9 +87,14 @@ public class ClickHouseUtils {
     }
 
     public static Tuple3<String[], Object[], int[]> getInsertColumnsAndDefaultValuesAndDefaultSizesForTable(
-            String[] urls, int urlIndex, Properties connInfo, String table) throws Exception {
+            String[] urls, int urlIndex, Properties connInfo, String table, @Nullable String[] insertColumns) throws Exception {
         Class.forName("com.github.housepower.jdbc.ClickHouseDriver");
 
+        boolean insertColumnsPresent = insertColumns != null;
+        Set<String> insertColumnSet = insertColumnsPresent ? Arrays.stream(insertColumns).collect(Collectors.toSet()):null;
+        Preconditions.checkArgument(!insertColumnsPresent || insertColumnSet.size() == insertColumns.length, "column names must be unique");
+
+        List<Tuple3<String, Object, Integer>> columnInfos = new ArrayList<>();
         int retryCount = 0;
         while (true) {
             retryCount++;
@@ -98,15 +105,14 @@ public class ClickHouseUtils {
                 connection = (ClickHouseConnection) DriverManager.getConnection(urls[urlIndex], connInfo);
                 stmt = connection.createStatement();
                 rst = stmt.executeQuery("desc " + table);
-
-                List<String> columnNames = new ArrayList<>();
-                List<Object> columnDefaultValues = new ArrayList<>();
-                List<Integer> columnDefaultSizes = new ArrayList<>();
                 while (rst.next()) {
                     String name = rst.getString("name");
                     String typeStr = rst.getString("type");
                     String defaultTypeStr = rst.getString("default_type");
                     String defaultExpression = rst.getString("default_expression");
+                    if (insertColumnsPresent && !insertColumnSet.contains(name)) {
+                        continue;
+                    }
                     if ("LowCardinality(String)".equals(typeStr)) {
                         typeStr = "String";
                     }
@@ -125,12 +131,20 @@ public class ClickHouseUtils {
                             defaultValue = type.defaultValue();
                         }
                     }
-                    columnNames.add(name);
-                    columnDefaultValues.add(defaultValue);
-                    columnDefaultSizes.add(getDefaultValueSize(type, defaultExpression));
+                    columnInfos.add(Tuple3.of(name, defaultValue, getDefaultValueSize(type, defaultExpression)));
                 }
 
-                return new Tuple3<>(columnNames.toArray(new String[columnNames.size()]), columnDefaultValues.toArray(new Object[columnDefaultValues.size()]), columnDefaultSizes.stream().mapToInt(x -> x).toArray());
+                Map<String, Tuple3<String, Object, Integer>> columnInfoMap = columnInfos.stream().collect(Collectors.toMap(x -> x.f0, x -> x));
+                String[] columnNames = insertColumnsPresent?insertColumns:columnInfos.stream().map(x->x.f0).toArray(String[]::new);
+                Object[] columnDefaultValues = new Object[columnNames.length];
+                int[] columnDefaultSizes = new int[columnNames.length];
+                for (int i = 0; i < columnNames.length; i++) {
+                    Tuple3<String, Object, Integer> columnInfo = columnInfoMap.get(columnNames[i]);
+                    Preconditions.checkNotNull(columnInfo, "not exist column:" + columnNames[i]);
+                    columnDefaultValues[i] = columnInfo.f1;
+                    columnDefaultSizes[i] = columnInfo.f2;
+                }
+                return Tuple3.of(columnNames, columnDefaultValues, columnDefaultSizes);
             } catch (SQLException e) {
                 LOG.error("ClickHouse Connection Exception url:" + urls[urlIndex], e);
                 if (retryCount >= 3) {
