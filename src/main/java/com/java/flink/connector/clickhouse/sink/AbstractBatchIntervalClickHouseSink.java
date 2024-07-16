@@ -37,6 +37,8 @@ import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoField;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -57,6 +59,7 @@ public abstract class AbstractBatchIntervalClickHouseSink<T> extends RichSinkFun
     // 标准日期时间格式，精确到毫秒：yyyy-MM-dd HH:mm:ss.SSS
     public static final String NORM_DATETIME_MS_PATTERN = "yyyy-MM-dd HH:mm:ss.SSS";
     public static final DateTimeFormatter NORM_DATETIME_MS_FORMATTER = DateTimeFormatter.ofPattern(NORM_DATETIME_MS_PATTERN);
+    public static final DateTimeFormatter DATETIME_FORMATTER = new DateTimeFormatterBuilder().appendPattern("yyyy-MM-dd HH:mm:ss").appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true).toFormatter();
     private final int batchSize;
     private final int batchByteSize;
     private final long batchIntervalMs;
@@ -630,6 +633,8 @@ public abstract class AbstractBatchIntervalClickHouseSink<T> extends RichSinkFun
                 return LocalDateTime.parse(str, NORM_DATETIME_FORMATTER).atZone(tz);
             } else if (str.length() == 23) {
                 return LocalDateTime.parse(str, NORM_DATETIME_MS_FORMATTER).atZone(tz);
+            } else if (str.length() >= 19) {
+                return LocalDateTime.parse(str, DATETIME_FORMATTER).atZone(tz);
             }
         }
 
@@ -657,6 +662,8 @@ public abstract class AbstractBatchIntervalClickHouseSink<T> extends RichSinkFun
                 return LocalDateTime.parse(str, NORM_DATETIME_FORMATTER).atZone(tz);
             } else if (str.length() == 23) {
                 return LocalDateTime.parse(str, NORM_DATETIME_MS_FORMATTER).atZone(tz);
+            } else if (str.length() >= 19) {
+                return LocalDateTime.parse(str, DATETIME_FORMATTER).atZone(tz);
             }
         }
 

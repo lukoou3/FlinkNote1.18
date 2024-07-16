@@ -141,7 +141,7 @@ public class RowDataBatchIntervalClickHouseSink extends AbstractBatchIntervalCli
             switch (logicalType.getTypeRoot()) {
                 case CHAR:
                 case VARCHAR:
-                    return (row, i) -> row.getString(i).toBytes();
+                    return (row, i) -> row.getString(i).toString();
                 case INTEGER:
                     return (row, i) -> row.getInt(i);
                 case BIGINT:
@@ -211,7 +211,7 @@ public class RowDataBatchIntervalClickHouseSink extends AbstractBatchIntervalCli
             switch (logicalType.getTypeRoot()) {
                 case CHAR:
                 case VARCHAR:
-                    return (array, i) -> array.getString(i).toBytes();
+                    return (array, i) -> array.getString(i).toString();
                 case INTEGER:
                     return (array, i) -> array.getInt(i);
                 case BIGINT:
