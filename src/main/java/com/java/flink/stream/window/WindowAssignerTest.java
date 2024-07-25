@@ -136,6 +136,44 @@ public class WindowAssignerTest {
     }
 
     @Test
+    public void testWatermarkOperator() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        // 每秒2个，5秒10个，实际过去5秒
+        env.setParallelism(2);
+
+        DataStream<String> ds = env.addSource(new FieldGeneSouce("[" + StringUtils.join(fieldGenesDesc, ",") + "]", 1, 1000)).setParallelism(1);
+
+        DataStream<OnlineLog> dsWithWatermark = ds.map(x -> JSON.parseObject(x, OnlineLog.class)).setParallelism(1).assignTimestampsAndWatermarks(
+                WatermarkStrategy.<OnlineLog>forBoundedOutOfOrderness(Duration.ofSeconds(1))
+                        .withTimestampAssigner((element, recordTimestamp) -> element.time)
+        );
+
+        // 事件时间窗口是左闭右开区间
+        dsWithWatermark.map(x -> x).print();
+
+        env.execute();
+    }
+
+    @Test
+    public void testWatermark() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        // 每秒2个，5秒10个，实际过去5秒
+        env.setParallelism(2);
+
+        DataStream<String> ds = env.addSource(new FieldGeneSouce("[" + StringUtils.join(fieldGenesDesc, ",") + "]", 1, 1000));
+
+        DataStream<OnlineLog> dsWithWatermark = ds.map(x -> JSON.parseObject(x, OnlineLog.class)).assignTimestampsAndWatermarks(
+                WatermarkStrategy.<OnlineLog>forBoundedOutOfOrderness(Duration.ofSeconds(1))
+                        .withTimestampAssigner((element, recordTimestamp) -> element.time)
+        );
+
+        // 事件时间窗口是左闭右开区间
+        dsWithWatermark.map(x -> x).print().setParallelism(1);
+
+        env.execute();
+    }
+
+    @Test
     public void testTumblingEventTimeWindows() throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         // 每秒2个，5秒10个，实际过去5秒
