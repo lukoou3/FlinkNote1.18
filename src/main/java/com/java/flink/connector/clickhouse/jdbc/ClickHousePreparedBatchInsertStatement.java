@@ -159,7 +159,7 @@ public class ClickHousePreparedBatchInsertStatement implements SQLPreparedStatem
             // this.block.initWriteBuffer();
         }
         // clean up block on close
-        this.block.cleanup();
+        // this.block.cleanup();
         this.isClosed = true;
     }
 

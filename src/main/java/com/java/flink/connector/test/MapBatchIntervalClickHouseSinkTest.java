@@ -106,7 +106,7 @@ public class MapBatchIntervalClickHouseSinkTest {
         Properties info = new Properties();
         info.put("user", "default");
         info.put("password", "123456");
-        MapBatchIntervalClickHouseSink clickHouseSink = new MapBatchIntervalClickHouseSink(10, 30 * 1000,
+        MapBatchIntervalClickHouseSink clickHouseSink = new MapBatchIntervalClickHouseSink(10, (1 << 20) * 128,30 * 1000,
                 "192.168.216.86:9001", "test.test_ck_sink_local", info);
         rstDs.addSink(clickHouseSink);
 
@@ -143,7 +143,7 @@ public class MapBatchIntervalClickHouseSinkTest {
         Properties info = new Properties();
         info.put("user", "default");
         info.put("password", "123456");
-        MapBatchIntervalClickHouseSink clickHouseSink = new MapBatchIntervalClickHouseSink(10, 30 * 1000,
+        MapBatchIntervalClickHouseSink clickHouseSink = new MapBatchIntervalClickHouseSink(10, (1 << 20) * 128, 30 * 1000,
                 "192.168.216.86:9001", "test.test_bitmap", info);
         rstDs.addSink(clickHouseSink);
 
@@ -174,7 +174,7 @@ public class MapBatchIntervalClickHouseSinkTest {
         Properties info = new Properties();
         info.put("user", "default");
         info.put("password", "123456");
-        MapBatchIntervalClickHouseSink clickHouseSink = new MapBatchIntervalClickHouseSink(10, 30 * 1000,
+        MapBatchIntervalClickHouseSink clickHouseSink = new MapBatchIntervalClickHouseSink(10, (1 << 20) * 128, 30 * 1000,
                 "192.168.216.86:9001", "test.test_bitmap2", info);
         rstDs.addSink(clickHouseSink);
 
@@ -205,7 +205,7 @@ public class MapBatchIntervalClickHouseSinkTest {
         Properties info = new Properties();
         info.put("user", "default");
         info.put("password", "123456");
-        MapBatchIntervalClickHouseSink clickHouseSink = new MapBatchIntervalClickHouseSink(100000, 30 * 1000,
+        MapBatchIntervalClickHouseSink clickHouseSink = new MapBatchIntervalClickHouseSink(100000, (1 << 20) * 128, 30 * 1000,
                 "192.168.216.86:9001", "test.test_bitmap2", info);
         rstDs.addSink(clickHouseSink);
 

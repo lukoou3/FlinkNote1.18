@@ -1,32 +1,31 @@
 package com.java.flink.connector.clickhouse.util;
 
-import com.github.housepower.buffer.ByteArrayWriter;
+import com.java.flink.connector.clickhouse.buffer.BufferPool;
+import com.java.flink.connector.clickhouse.buffer.ReusedColumnWriterBuffer;
+import com.java.flink.connector.clickhouse.jdbc.DataTypeStringV2;
 import com.github.housepower.data.*;
 import com.github.housepower.data.type.*;
-import com.github.housepower.data.type.complex.DataTypeArray;
-import com.github.housepower.data.type.complex.DataTypeDecimal;
-import com.github.housepower.data.type.complex.DataTypeFixedString;
-import com.github.housepower.data.type.complex.DataTypeString;
+import com.github.housepower.data.type.complex.*;
 import com.github.housepower.jdbc.ClickHouseArray;
 import com.github.housepower.jdbc.ClickHouseConnection;
 import com.github.housepower.misc.BytesCharSeq;
 import com.github.housepower.misc.DateTimeUtil;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -87,10 +86,15 @@ public class ClickHouseUtils {
         return sb.toString();
     }
 
-    public static Tuple2<String[], Object[]> getInsertColumnsAndDefaultValuesForTable(
-            String[] urls, int urlIndex, Properties connInfo, String table) throws Exception {
+    public static Tuple3<String[], Object[], int[]> getInsertColumnsAndDefaultValuesAndDefaultSizesForTable(
+            String[] urls, int urlIndex, Properties connInfo, String table, @Nullable String[] insertColumns) throws Exception {
         Class.forName("com.github.housepower.jdbc.ClickHouseDriver");
 
+        boolean insertColumnsPresent = insertColumns != null;
+        Set<String> insertColumnSet = insertColumnsPresent ? Arrays.stream(insertColumns).collect(Collectors.toSet()):null;
+        Preconditions.checkArgument(!insertColumnsPresent || insertColumnSet.size() == insertColumns.length, "column names must be unique");
+
+        List<Tuple3<String, Object, Integer>> columnInfos = new ArrayList<>();
         int retryCount = 0;
         while (true) {
             retryCount++;
@@ -101,14 +105,14 @@ public class ClickHouseUtils {
                 connection = (ClickHouseConnection) DriverManager.getConnection(urls[urlIndex], connInfo);
                 stmt = connection.createStatement();
                 rst = stmt.executeQuery("desc " + table);
-
-                List<String> columnNames = new ArrayList<>();
-                List<Object> columnDefaultValues = new ArrayList<>();
                 while (rst.next()) {
                     String name = rst.getString("name");
                     String typeStr = rst.getString("type");
                     String defaultTypeStr = rst.getString("default_type");
                     String defaultExpression = rst.getString("default_expression");
+                    if (insertColumnsPresent && !insertColumnSet.contains(name)) {
+                        continue;
+                    }
                     if ("LowCardinality(String)".equals(typeStr)) {
                         typeStr = "String";
                     }
@@ -116,19 +120,31 @@ public class ClickHouseUtils {
                         continue;
                     }
                     IDataType<?, ?> type = DataTypeFactory.get(typeStr, connection.serverContext());
+
                     Object defaultValue = parseDefaultValue(type, defaultExpression); // 只解析数字和字符串
                     if (defaultValue == null && !type.nullable()) {
                         if (type instanceof DataTypeArray) {
                             defaultValue = new ClickHouseArray(((DataTypeArray) type).getElemDataType(), new Object[0]);
+                        } else if (type instanceof DataTypeMap) {
+                            defaultValue = Collections.emptyMap();
                         } else {
                             defaultValue = type.defaultValue();
                         }
                     }
-                    columnNames.add(name);
-                    columnDefaultValues.add(defaultValue);
+                    columnInfos.add(Tuple3.of(name, defaultValue, getDefaultValueSize(type, defaultExpression)));
                 }
 
-                return new Tuple2<>(columnNames.toArray(new String[columnNames.size()]), columnDefaultValues.toArray(new Object[columnDefaultValues.size()]));
+                Map<String, Tuple3<String, Object, Integer>> columnInfoMap = columnInfos.stream().collect(Collectors.toMap(x -> x.f0, x -> x));
+                String[] columnNames = insertColumnsPresent?insertColumns:columnInfos.stream().map(x->x.f0).toArray(String[]::new);
+                Object[] columnDefaultValues = new Object[columnNames.length];
+                int[] columnDefaultSizes = new int[columnNames.length];
+                for (int i = 0; i < columnNames.length; i++) {
+                    Tuple3<String, Object, Integer> columnInfo = columnInfoMap.get(columnNames[i]);
+                    Preconditions.checkNotNull(columnInfo, "not exist column:" + columnNames[i]);
+                    columnDefaultValues[i] = columnInfo.f1;
+                    columnDefaultSizes[i] = columnInfo.f2;
+                }
+                return Tuple3.of(columnNames, columnDefaultValues, columnDefaultSizes);
             } catch (SQLException e) {
                 LOG.error("ClickHouse Connection Exception url:" + urls[urlIndex], e);
                 if (retryCount >= 3) {
@@ -241,7 +257,7 @@ public class ClickHouseUtils {
     }
 
     public static void copyInsertBlockColumns(Block src, Block desc) throws Exception {
-        desc.cleanup();
+        //desc.cleanup();
 
         IColumn[] srcColumns = (IColumn[]) blockColumnsField.get(src);
         IColumn[] descColumns = (IColumn[]) blockColumnsField.get(desc);
@@ -252,18 +268,31 @@ public class ClickHouseUtils {
         blockRowCntField.set(desc, blockRowCntField.get(src));
     }
 
+    public static void initBlockWriteBuffer(Block block, BufferPool bufferPool) throws Exception {
+        IColumn[] columns = (IColumn[]) blockColumnsField.get(block);
+        for (int i = 0; i < columns.length; i++) {
+            ColumnWriterBuffer writeBuffer = columns[i].getColumnWriterBuffer();
+            if(writeBuffer == null){
+                writeBuffer = new ReusedColumnWriterBuffer(bufferPool);
+                columns[i].setColumnWriterBuffer(writeBuffer);
+            }else{
+                writeBuffer.reset();
+            }
+        }
+    }
+
     public static void resetInsertBlockColumns(Block block) throws Exception {
-        block.cleanup();
         blockRowCntField.set(block, 0);
 
         IColumn[] columns = (IColumn[]) blockColumnsField.get(block);
         for (int i = 0; i < columns.length; i++) {
+            ColumnWriterBuffer writeBuffer = columns[i].getColumnWriterBuffer();
             String name = columns[i].name();
             IDataType<?, ?> dataType = columns[i].type();
             columns[i] = ColumnFactory.createColumn(name, dataType, null); // values用于rst读取
+            writeBuffer.reset();
+            columns[i].setColumnWriterBuffer(writeBuffer);
         }
-
-        block.initWriteBuffer();
     }
 
     private static Object parseDefaultValue(IDataType<?, ?> type, String defaultExpression) {
@@ -293,33 +322,118 @@ public class ClickHouseUtils {
         return defaultValue;
     }
 
-    // 仅用于测试
-    public static void showBlockColumnsByteSize(Block block) throws Exception {
-        IColumn[] columns = (IColumn[]) blockColumnsField.get(block);
-        Field field = AbstractColumn.class.getDeclaredField("buffer");
-        field.setAccessible(true);
-        Field columnWriterField = ColumnWriterBuffer.class.getDeclaredField("columnWriter");
-        columnWriterField.setAccessible(true);
-        Field byteBufferListField = ByteArrayWriter.class.getDeclaredField("byteBufferList");
-        byteBufferListField.setAccessible(true);
-        int size = 0;
-        int totalSize = 0;
-        double unitM = 1 << 20;
-        LOG.warn("rowCount:" + block.rowCnt());
-        for (int i = 0; i < columns.length; i++) {
-            Object columnWriter = columnWriterField.get(field.get(columns[i]));
-            List<ByteBuffer> byteBufferList =
-                    (List<ByteBuffer>) byteBufferListField.get(columnWriter);
-            size = 0;
-            for (ByteBuffer byteBuffer : byteBufferList) {
-                size += byteBuffer.position();
-            }
-            totalSize += size;
-            if (size > unitM) {
-                // LOG.warn(columns[i].name() + "buf cnt:" + byteBufferList.size() +  ", size:" +
-                // size/unitM + "M");
+    private static int getDefaultValueSize(IDataType<?, ?> type, String defaultExpression){
+        if (type instanceof DataTypeString || type instanceof DataTypeFixedString || type instanceof DataTypeStringV2) {
+            if(StringUtils.isBlank(defaultExpression)){
+                return  1;
+            }else{
+                return writeBytesSizeByLen(defaultExpression.getBytes(StandardCharsets.UTF_8).length);
             }
         }
-        LOG.warn("totalSize:" + totalSize / unitM + "M");
+
+        if (type instanceof DataTypeDate) {
+            return 2;
+        }
+
+        if (type instanceof DataTypeDate32) {
+            return 4;
+        }
+
+        if (type instanceof DataTypeDateTime) {
+            return 4;
+        }
+
+        if (type instanceof DataTypeDateTime64) {
+            return 8;
+        }
+
+        if (type instanceof DataTypeInt8 || type instanceof DataTypeUInt8) {
+            return 1;
+        }
+
+        if (type instanceof DataTypeInt16 || type instanceof DataTypeUInt16) {
+            return 2;
+        }
+
+        if (type instanceof DataTypeInt32 || type instanceof DataTypeUInt32) {
+            return 4;
+        }
+
+        if (type instanceof DataTypeInt64 || type instanceof DataTypeUInt64) {
+            return 8;
+        }
+
+        if (type instanceof DataTypeFloat32) {
+            return 4;
+        }
+
+        if (type instanceof DataTypeFloat64) {
+            return 8;
+        }
+
+        if (type instanceof DataTypeDecimal) {
+            return 32;
+        }
+
+        if (type instanceof DataTypeUUID) {
+            return 16;
+        }
+
+        if (type instanceof DataTypeNothing) {
+            return 1;
+        }
+
+        if (type instanceof DataTypeNullable) {
+            return getDefaultValueSize(((DataTypeNullable)type).getNestedDataType(), defaultExpression);
+        }
+
+        if (type instanceof DataTypeArray) {
+            return 0;
+        }
+
+        if (type instanceof DataTypeMap) {
+            return 0;
+        }
+
+        throw new UnsupportedOperationException("Unsupported type: " + type);
     }
+
+    public static int writeBytesSizeByLen(final int len) {
+        int bytes = 1, value = len;
+        while ((value & 0xffffff80) != 0L) {
+            bytes += 1;
+            value >>>= 7;
+        }
+        return bytes + len;
+    }
+
+    public static BlockColumnsByteSizeInfo getBlockColumnsByteSizeInfo(Block block) throws Exception {
+        IColumn[] columns = (IColumn[]) blockColumnsField.get(block);
+        long size = 0, bufferSize = 0;
+        long totalSize = 0, totalBufferSize = 0;
+        long sizeThreshold = Math.max(200 << 20 / columns.length * 2, 4 << 20);
+        StringBuilder sb = new StringBuilder();
+
+        for (int i = 0; i < columns.length; i++) {
+            List<ByteBuffer> byteBufferList = ((ReusedColumnWriterBuffer) columns[i].getColumnWriterBuffer()).getBufferList();
+            size = 0;
+            bufferSize = 0;
+            for (ByteBuffer byteBuffer : byteBufferList) {
+                size += byteBuffer.position();
+                bufferSize += byteBuffer.capacity();
+            }
+            totalSize += size;
+            totalBufferSize += bufferSize;
+            if (bufferSize > sizeThreshold) {
+                if(sb.length() > 0){
+                    sb.append(',');
+                }
+                sb.append(String.format("%s:%d M", columns[i].name(), (bufferSize >>> 20)) );
+            }
+        }
+
+        return new BlockColumnsByteSizeInfo(totalSize, totalBufferSize, sb.toString());
+    }
+
+
 }
