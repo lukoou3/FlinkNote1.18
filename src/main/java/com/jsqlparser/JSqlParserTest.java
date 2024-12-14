@@ -12,7 +12,7 @@ public class JSqlParserTest {
      */
     @Test
     public void test() throws Exception {
-        String sql = "select a, substr(b, 1, 10) dt, substr(nvl(b, '2024'), 1, 10) dt2, c c2, 1 d, '1' e from table";
+        String sql = "select a, substr(b, 1, 10) dt, substr(nvl(b, '2024'), 1, 10) dt2, c c2, 1 d, '1' e, if(a>1, null, 2) f from table";
         Statement statement = CCJSqlParserUtil.parse(sql);
         System.out.println(statement);
         sql = "select a, substr(b, 1, 10) dt, c as c2, 1 d, '1' e";
